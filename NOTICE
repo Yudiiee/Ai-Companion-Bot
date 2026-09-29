@@ -1,0 +1,14 @@
+AI Companion
+Copyright (C) 2026 Udit (https://github.com/Yudiiee)
+
+This program is a modified version of AI-Player by shasankp000
+(https://github.com/shasankp000/AI-Player), which is licensed under the GNU General
+Public License, version 2. AI Companion is distributed under the same license; see LICENSE.
+
+Modified by Udit in 2026: renamed and repackaged as AI Companion, with a new
+human-like behaviour layer (chat, body language, pathfinding, house building and
+storage, mining staircase and strip mining, food farm, combat and survival reflexes)
+and a port to Minecraft 26.3.
+
+The language models used by the chat intent system are downloaded at first launch
+from the original AI-Player release assets.
