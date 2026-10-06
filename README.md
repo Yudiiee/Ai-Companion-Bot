@@ -28,6 +28,11 @@ on their own out of the box, and you can hook them up to an LLM for real convers
   off if there's water or lava in them. Each trip carries on where the last one stopped.
 - **Food farm.** A 9×9 plot beside the house with water, torches and crops (carrots/potatoes, then
   wheat, then beetroot). It harvests, replants, bakes bread and keeps enough food on hand.
+- **A house of its own.** Each companion builds one of six medieval houses as its home (cottage, townhouse,
+  inn, workshop, hall, manor), moves in once it's mostly up and keeps working on it until it's finished.
+- **Knows its trees.** Spruce is spruce and dark oak is dark oak: it chops the right trees for a build, knows
+  where each grows and what colour it comes out, and when a wood can't be had it picks the closest-looking one
+  and tells you.
 - **Builds from schematics.** Drop WorldEdit `.schem`, structure-block `.nbt` or Litematica `.litematic` files in
   `config/ai-companion/schematics` and say `build the iron farm`. It gathers what it can, builds it in the right
   order with pistons, observers and redstone pointing the right way, crafting the stairs, slabs, trapdoors, stone

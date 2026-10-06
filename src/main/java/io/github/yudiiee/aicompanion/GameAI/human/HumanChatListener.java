@@ -57,7 +57,7 @@ public final class HumanChatListener {
     // Commands understood locally
     // ------------------------------------------------------------------------
 
-    public enum Local { FOLLOW, STAY, WANDER, COME, GIVE, INVENTORY, CRAFT, PVP, DIG, STRIP, COLLECT, FARM, ORE, WOOD, MINE, PLAY, STOP, HOUSE, CHEST, TAKE, STORE, HOME, CHESTS, BLUEPRINT, SMALL_TALK }
+    public enum Local { FOLLOW, STAY, WANDER, COME, GIVE, INVENTORY, CRAFT, PVP, DIG, STRIP, COLLECT, FARM, ORE, WOOD, MINE, PLAY, STOP, HOUSE, CHEST, TAKE, STORE, HOME, CHESTS, BLUEPRINT, TREE, SMALL_TALK }
 
     private static final Pattern FOLLOW = Pattern.compile("\\b(follow me|come with me|let'?s go|stick with me|tag along)\\b");
     private static final Pattern STAY = Pattern.compile("\\b(stay here|stay there|stay put|wait here|wait there|stop following|don'?t move|stop moving)\\b");
@@ -93,6 +93,7 @@ public final class HumanChatListener {
             if (CHESTS.matcher(m).find()) return Local.CHESTS;
             if (Storage.CHEST_HERE.matcher(m).find()) return Local.CHEST;
             if (Storage.parseTake(m) != null) return Local.TAKE;
+            if (Woods.isQuestion(m)) return Local.TREE;
             if (Blueprints.parse(m, null, null) != null) return Local.BLUEPRINT;
             if (House.request(m, null) != null) return Local.HOUSE;
             if (Storage.STORE.matcher(m).find()) return Local.STORE;
@@ -163,6 +164,30 @@ public final class HumanChatListener {
 
         engage(target, sender);
         askLlm(target, sender, text);
+    }
+
+    /** "what tree is that": the nearest log, leaves or planks to the player who asked. Server thread. */
+    private static String whatWood(ServerPlayer player) {
+        net.minecraft.server.level.ServerLevel level = player.level();
+        net.minecraft.core.BlockPos at = player.blockPosition();
+        String best = null, bestPath = null;
+        double bd = Double.MAX_VALUE;
+        for (int dx = -10; dx <= 10; dx++) for (int dy = -4; dy <= 12; dy++) for (int dz = -10; dz <= 10; dz++) {
+            double d = dx * dx + dz * dz + dy * dy * 0.5;
+            if (d >= bd) continue;
+            net.minecraft.core.BlockPos p = at.offset(dx, dy, dz);
+            if (!level.isLoaded(p)) continue;
+            String path = SurvivalBrain.blockPath(level.getBlockState(p));
+            String sp = Woods.speciesOf(path);
+            if (sp == null) continue;
+            best = sp;
+            bestPath = path;
+            bd = d;
+        }
+        if (best == null) return "don't see any trees or wood near you";
+        boolean azalea = bestPath.contains("azalea");
+        String seen = azalea ? "that's an azalea tree, it has oak logs" : "that's " + best.replace('_', ' ');
+        return azalea ? seen + ". " + Woods.describe("oak", "oak") : Woods.describe(best, seen);
     }
 
     private static boolean isHost(MinecraftServer server, ServerPlayer player) {
@@ -241,6 +266,11 @@ public final class HumanChatListener {
                 }
                 SurvivalBrain.startJob(bot, req.label(), true, req.job());
                 HumanChat.say(server, botName, req.ack());
+            }
+            case TREE -> {
+                String m = HumanReactions.normalise(text, botName);
+                String a = Woods.answerNamed(m);
+                HumanChat.say(server, botName, a != null ? a : whatWood(sender));
             }
             case BLUEPRINT -> {
                 Blueprints.Ask a = Blueprints.parse(HumanReactions.normalise(text, botName), sender, bot);

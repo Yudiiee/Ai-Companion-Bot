@@ -49,8 +49,6 @@ final class BlueprintBuilder {
 
     /** Most blocks it will take on in one design. */
     static final int MAX_BLOCKS = 40_000;
-    /** Won't go off and gather more than this many of one thing for a build. */
-    static final int MAX_GATHER = 640;
 
     private BlueprintBuilder() {}
 
@@ -67,11 +65,20 @@ final class BlueprintBuilder {
     }
 
     /** A design put somewhere: its local (0,0,0) is at {@code origin}. */
-    record Placed(Schematic plan, BlockPos origin, int rot, String dim) {
+    record Placed(Schematic plan, BlockPos origin, int rot, String dim, Map<String, String> swaps) {
+        Placed(Schematic plan, BlockPos origin, int rot, String dim) {
+            this(plan, origin, rot, dim, new ConcurrentHashMap<>());
+        }
+
         BlockPos world(int x, int y, int z) { return origin.offset(x, y, z); }
 
+        /** The planned block, with any stand-in agreed for this build swapped in. */
         State at(BlockPos p) {
-            return plan.at(p.getX() - origin.getX(), p.getY() - origin.getY(), p.getZ() - origin.getZ());
+            return local(p.getX() - origin.getX(), p.getY() - origin.getY(), p.getZ() - origin.getZ());
+        }
+
+        State local(int x, int y, int z) {
+            return swapped(plan.at(x, y, z), swaps);
         }
 
         boolean contains(BlockPos p) {
@@ -79,6 +86,98 @@ final class BlueprintBuilder {
         }
 
         BlockPos center() { return origin.offset(plan.sx / 2, 0, plan.sz / 2); }
+    }
+
+    // ------------------------------------------------------------------------
+    // Stand-ins: when the exact block can't be had, the closest-looking one (agreed per build)
+    // ------------------------------------------------------------------------
+
+    /** "wood:warped" -> "dark_oak" (a kind of wood for another), or "calcite" -> "diorite" (a block for another). */
+    static State swapped(State s, Map<String, String> swaps) {
+        if (s == null || swaps.isEmpty()) return s;
+        for (int hop = 0; hop < 6; hop++) { // dark oak -> spruce -> jungle: follow the chain
+            String path = s.path();
+            String[] w = Rules.wood(path);
+            String to = w != null ? swaps.get("wood:" + w[0]) : swaps.get(path);
+            if (to == null) return s;
+            State next = w != null ? s.withId(Rules.woodPath(to, w[1])) : s.withId(to);
+            if (next.id().equals(s.id())) return s;
+            s = next;
+        }
+        return s;
+    }
+
+    /** Builds from before wood had to match exactly: any wood of the right shape counts. */
+    static final String LEGACY = "legacy";
+
+    private static boolean looseWoodMatch(Placed p, State plan, State world) {
+        if (!p.swaps().containsKey(LEGACY)) return false;
+        String[] a = Rules.wood(plan.path()), c = Rules.wood(world.path());
+        return a != null && c != null && a[1].equals(c[1]);
+    }
+
+    static String encodeSwaps(Map<String, String> swaps) {
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, String> e : new TreeMap<>(swaps).entrySet()) {
+            if (e.getKey().startsWith("upgraded:")) continue; // only for this run
+            if (sb.length() > 0) sb.append(';');
+            sb.append(e.getKey()).append('>').append(e.getValue());
+        }
+        return sb.toString();
+    }
+
+    static Map<String, String> decodeSwaps(String s) {
+        Map<String, String> out = new ConcurrentHashMap<>();
+        if (s == null || s.isBlank()) return out;
+        for (String part : s.split(";")) {
+            int i = part.indexOf('>');
+            if (i > 0 && i < part.length() - 1) out.put(part.substring(0, i), part.substring(i + 1));
+        }
+        return out;
+    }
+
+    /**
+     * Blocks that look about the same, closest first, for when the real one can't be had (same
+     * shape: stairs for stairs, full blocks for full blocks).
+     */
+    static final Map<String, List<String>> LOOKALIKES = new HashMap<>();
+
+    private static void like(String block, String... options) { LOOKALIKES.put(block, List.of(options)); }
+
+    static {
+        // sea-green prismarine (ocean monuments): mossy stone is the nearest green-grey you can make
+        like("prismarine_brick_stairs", "mossy_stone_brick_stairs", "mossy_cobblestone_stairs", "stone_brick_stairs");
+        like("prismarine_bricks", "mossy_stone_bricks", "mossy_cobblestone", "stone_bricks");
+        like("prismarine_brick_slab", "mossy_stone_brick_slab", "mossy_cobblestone_slab", "stone_brick_slab");
+        like("prismarine", "mossy_cobblestone", "mossy_stone_bricks", "cobblestone");
+        like("prismarine_stairs", "mossy_cobblestone_stairs", "mossy_stone_brick_stairs", "cobblestone_stairs");
+        like("prismarine_slab", "mossy_cobblestone_slab", "mossy_stone_brick_slab", "cobblestone_slab");
+        like("prismarine_wall", "mossy_cobblestone_wall", "mossy_stone_brick_wall", "cobblestone_wall");
+        like("dark_prismarine", "cobbled_deepslate", "mossy_stone_bricks", "stone_bricks");
+        like("dark_prismarine_stairs", "cobbled_deepslate_stairs", "mossy_stone_brick_stairs", "stone_brick_stairs");
+        like("dark_prismarine_slab", "cobbled_deepslate_slab", "mossy_stone_brick_slab", "stone_brick_slab");
+        // white calcite (mountains, geodes): diorite is the other white stone
+        like("calcite", "diorite", "andesite", "stone");
+        like("cracked_stone_bricks", "stone_bricks");
+        like("chiseled_stone_bricks", "stone_bricks");
+        like("mossy_cobblestone", "cobblestone");
+        like("mossy_stone_bricks", "stone_bricks");
+        like("mossy_cobblestone_wall", "cobblestone_wall");
+        like("mossy_stone_brick_wall", "stone_brick_wall");
+        like("mossy_cobblestone_stairs", "cobblestone_stairs");
+        like("mossy_stone_brick_stairs", "stone_brick_stairs");
+        like("mossy_cobblestone_slab", "cobblestone_slab");
+        like("mossy_stone_brick_slab", "stone_brick_slab");
+        like("blast_furnace", "furnace");
+        like("polished_andesite", "andesite");
+        like("polished_diorite", "diorite");
+        like("tuff", "andesite", "cobblestone");
+        for (String c : new String[]{"white", "light_gray", "gray", "black", "brown", "red", "orange", "yellow", "lime", "green",
+                "cyan", "light_blue", "blue", "purple", "magenta", "pink"}) {
+            like(c + "_stained_glass", "glass");          // tinted glass needs dye; clear glass for now
+            like(c + "_stained_glass_pane", "glass_pane");
+            like(c + "_terracotta", "terracotta");
+        }
     }
 
     /** Quarter turns that make a design whose front is {@code front} face {@code faceTo}. */
@@ -160,7 +259,7 @@ final class BlueprintBuilder {
             anchor = h.middle();
         } else {
             BlockPos f = BotPathing.feet(bot);
-            for (int r : new int[]{4, 9, 14, 20, 28}) {
+            for (int r : new int[]{4, 9, 14, 20, 28, 40, 56}) {
                 for (int a = 0; a < 8; a++) {
                     double ang = a * Math.PI / 4;
                     int cx = f.getX() + (int) Math.round(Math.cos(ang) * (r + base.sx / 2.0));
@@ -264,6 +363,7 @@ final class BlueprintBuilder {
                         continue;
                     }
                     String path = SurvivalBrain.blockPath(s);
+                    if (SurvivalBrain.isLog(s) && Protection.isNaturalTreeLog(level, p)) { work += 4; continue; } // a tree to chop
                     if (Protection.isManMade(path) || SurvivalBrain.isLog(s) || path.contains("spawner")) return BAD;
                     if (dy >= 1) work += Building.isFree(level, p) ? 1 : 3;
                 }
@@ -284,15 +384,23 @@ final class BlueprintBuilder {
     /** The difference between a design and the world. */
     static final class Work {
         final List<Cell> clear = new ArrayList<>(), solid = new ArrayList<>(), fluid = new ArrayList<>(), attach = new ArrayList<>();
+        /** Flowers, leaves, carpets...: placed if it has them, not needed for the build to count as done. */
+        final List<Cell> decor = new ArrayList<>();
         final Map<String, Integer> needs = new TreeMap<>(), unobtainable = new TreeMap<>();
         int water, leftAlone, unloaded;
         /** Somebody's build in the way (an example of what). */
         int manMade;
         String manMadeWhat;
 
-        boolean isEmpty() { return clear.isEmpty() && solid.isEmpty() && fluid.isEmpty() && attach.isEmpty(); }
+        boolean isEmpty() { return clear.isEmpty() && solid.isEmpty() && fluid.isEmpty() && attach.isEmpty() && decor.isEmpty(); }
 
-        int size() { return clear.size() + solid.size() + fluid.size() + attach.size(); }
+        int size() { return clear.size() + solid.size() + fluid.size() + attach.size() + decor.size(); }
+
+        /** What still has to happen for the build to count as done (decoration aside). */
+        int essential() { return clear.size() + solid.size() + fluid.size() + attach.size(); }
+
+        /** Blocks still to go in (for how far along it is; clearing a tree doesn't count). */
+        int toPlace() { return solid.size() + fluid.size() + attach.size(); }
     }
 
     static State worldState(ServerLevel level, BlockPos p) {
@@ -331,18 +439,18 @@ final class BlueprintBuilder {
         Schematic s = p.plan();
         for (int z = 0; z < s.sz; z++) {
             for (int x = 0; x < s.sx; x++) {
-                State plan = s.at(x, y, z);
+                State plan = p.local(x, y, z);
                 if (plan == null) continue;
                 BlockPos pos = p.world(x, y, z);
                 if (!level.isLoaded(pos)) { w.unloaded++; continue; }
                 Rules.Kind k = Rules.kind(plan);
                 if (k == Rules.Kind.KEEP) continue;
                 if (Rules.isTallPlant(plan.path()) && y > 0) {
-                    State under = s.at(x, y - 1, z);
+                    State under = p.local(x, y - 1, z);
                     if (under != null && Rules.grown(under.path()).equals(Rules.grown(plan.path()))) continue; // it grows there by itself
                 }
                 State world = worldState(level, pos);
-                if (Rules.matches(plan, world)) {
+                if (Rules.matches(plan, world) || looseWoodMatch(p, plan, world)) {
                     if (Rules.needsWaterlogging(plan, world)) { w.fluid.add(new Cell(pos, plan, Op.WATER)); w.water++; }
                     continue;
                 }
@@ -374,6 +482,10 @@ final class BlueprintBuilder {
                     else w.needs.merge("lava_bucket", 1, Integer::sum);
                     continue;
                 }
+                if (Rules.decorative(plan.path())) {
+                    w.decor.add(new Cell(pos, plan, Op.PLACE));
+                    continue;
+                }
                 (Rules.phase(plan) == 2 ? w.attach : w.solid).add(new Cell(pos, plan, Op.PLACE));
                 if (k == Rules.Kind.BLOCK) for (Rules.Need n : Rules.items(plan)) w.needs.merge(n.item(), n.count(), Integer::sum);
                 if ("true".equals(plan.get("waterlogged"))) { w.fluid.add(new Cell(pos, plan, Op.WATER)); w.water++; }
@@ -401,49 +513,67 @@ final class BlueprintBuilder {
     // Materials
     // ------------------------------------------------------------------------
 
-    /** Any wood will do for a wooden thing (oak stairs for spruce stairs: same shape), coal or charcoal. */
+    /** Most of one thing it will go out and gather for a build. */
+    static final int MAX_GATHER = 1500;
+
+    /**
+     * Which items count for a need: exactly that one (spruce stairs aren't dark oak stairs). A few
+     * recipe ingredients really can be any wood: "#planks", "#logs", "#wooden_slab". Any bed; coal or charcoal.
+     */
     static Predicate<String> itemTest(String item) {
-        String[] w = Rules.wood(item);
-        if (w != null) return p -> {
-            String[] x = Rules.wood(p);
-            return x != null && x[1].equals(w[1]);
-        };
-        if (item.equals("coal")) return p -> p.equals("coal") || p.equals("charcoal");
+        switch (item) {
+            case "#planks": return p -> p.endsWith("_planks");
+            case "#logs": return p -> {
+                String[] w = Rules.wood(p);
+                return w != null && w[1].equals("log");
+            };
+            case "#wooden_slab": return p -> {
+                String[] w = Rules.wood(p);
+                return w != null && w[1].equals("slab");
+            };
+            case "coal": return p -> p.equals("coal") || p.equals("charcoal");
+            default: break;
+        }
+        if (item.endsWith("_bed")) return p -> p.endsWith("_bed");
         return item::equals;
+    }
+
+    /** Per bot: the exact items the build in hand needs, so "any planks" recipes leave them alone. */
+    private static final Map<java.util.UUID, Set<String>> RESERVED = new ConcurrentHashMap<>();
+
+    /** {@link #itemTest}, with a wildcard ("#planks") not taking what the build needs exactly. */
+    static Predicate<String> testFor(ServerPlayer bot, String item) {
+        Predicate<String> base = itemTest(item);
+        if (!item.startsWith("#")) return base;
+        Set<String> reserved = RESERVED.getOrDefault(bot.getUUID(), Set.of());
+        return p -> base.test(p) && !reserved.contains(p);
+    }
+
+    /** Anything made of this kind of wood (logs, planks, stairs...). */
+    static Predicate<String> ofSpecies(String species) {
+        return p -> {
+            String[] w = Rules.wood(p);
+            return w != null && w[0].equals(species);
+        };
     }
 
     /** How many of each item it still needs beyond what's in its pockets. Server thread. */
     static Map<String, Integer> shortfall(ServerPlayer bot, Map<String, Integer> needs) {
         Map<String, Integer> out = new TreeMap<>();
-        Map<String, Integer> pooled = new HashMap<>(); // planks/logs share a pool
         for (Map.Entry<String, Integer> e : needs.entrySet()) {
-            String key = poolKey(e.getKey());
-            pooled.merge(key, e.getValue(), Integer::sum);
-        }
-        for (Map.Entry<String, Integer> e : pooled.entrySet()) {
-            String item = e.getKey();
-            int have = Gathering.countOf(bot, itemTest(item));
-            if (have < e.getValue()) out.put(item, e.getValue() - have);
+            int have = Gathering.countOf(bot, itemTest(e.getKey()));
+            if (have < e.getValue()) out.put(e.getKey(), e.getValue() - have);
         }
         return out;
     }
 
-    private static String poolKey(String item) {
-        String[] w = Rules.wood(item);
-        return w == null ? item : Rules.woodPath("oak", w[1]);
-    }
-
     static String label(String item) {
-        String[] w = Rules.wood(item);
-        if (w != null && w[0].equals("oak")) {
-            return switch (w[1]) {
-                case "planks" -> "planks";
-                case "log" -> "logs";
-                case "stripped_log" -> "stripped logs";
-                default -> "wooden " + w[1].replace('_', ' ') + "s";
-            };
-        }
-        return item.replace('_', ' ');
+        return switch (item) {
+            case "#planks" -> "planks";
+            case "#logs" -> "logs";
+            case "#wooden_slab" -> "wooden slabs";
+            default -> item.replace('_', ' ');
+        };
     }
 
     // ------------------------------------------------------------------------
@@ -465,51 +595,72 @@ final class BlueprintBuilder {
         RECIPES.put(item, new Recipe(item, out, in(kv), table, null));
     }
 
+    /** Stairs (6 -> 4), slabs (3 -> 6) and walls (6 -> 6) of a stone. */
+    private static void family(String base, String prefix, boolean wall) {
+        r(prefix + "_stairs", 4, true, base, 6);
+        r(prefix + "_slab", 6, true, base, 3);
+        if (wall) r(prefix + "_wall", 6, true, base, 6);
+    }
+
     static {
-        r("stick", 4, false, "oak_planks", 2);
-        r("crafting_table", 1, false, "oak_planks", 4);
-        r("chest", 1, true, "oak_planks", 8);
-        r("barrel", 1, true, "oak_planks", 6, "oak_slab", 2);
+        r("#planks", 4, false, "#logs", 1);
+        r("#wooden_slab", 6, true, "#planks", 3);
+        r("stick", 4, false, "#planks", 2);
+        r("crafting_table", 1, false, "#planks", 4);
+        r("chest", 1, true, "#planks", 8);
+        r("barrel", 1, true, "#planks", 6, "#wooden_slab", 2);
+        r("composter", 1, true, "#wooden_slab", 7);
         r("ladder", 3, true, "stick", 7);
         r("torch", 4, false, "coal", 1, "stick", 1);
         r("stone_bricks", 4, false, "stone", 4);
-        r("stone_brick_slab", 6, true, "stone_bricks", 3);
-        r("stone_brick_stairs", 4, true, "stone_bricks", 6);
-        r("stone_brick_wall", 6, true, "stone_bricks", 6);
+        r("mossy_stone_bricks", 1, false, "stone_bricks", 1, "moss_block", 1);
+        r("mossy_cobblestone", 1, false, "cobblestone", 1, "moss_block", 1);
         r("chiseled_stone_bricks", 1, false, "stone_brick_slab", 2);
-        r("stone_slab", 6, true, "stone", 3);
-        r("stone_stairs", 4, true, "stone", 6);
+        r("polished_andesite", 4, false, "andesite", 4);
+        r("polished_diorite", 4, false, "diorite", 4);
+        r("polished_granite", 4, false, "granite", 4);
         r("stone_pressure_plate", 1, false, "stone", 2);
         r("stone_button", 1, false, "stone", 1);
-        r("cobblestone_slab", 6, true, "cobblestone", 3);
-        r("cobblestone_stairs", 4, true, "cobblestone", 6);
-        r("cobblestone_wall", 6, true, "cobblestone", 6);
         r("furnace", 1, true, "cobblestone", 8);
+        r("smoker", 1, true, "furnace", 1, "#logs", 4);
         r("glass_pane", 16, true, "glass", 6);
         r("iron_nugget", 9, false, "iron_ingot", 1);
         r("iron_chain", 1, true, "iron_ingot", 1, "iron_nugget", 2);
         r("lantern", 1, true, "iron_nugget", 8, "torch", 1);
         r("hopper", 1, true, "iron_ingot", 5, "chest", 1);
         r("bucket", 1, true, "iron_ingot", 3);
+        r("cauldron", 1, true, "iron_ingot", 7);
         r("iron_bars", 16, true, "iron_ingot", 6);
         r("rail", 16, true, "iron_ingot", 6, "stick", 1);
-        r("campfire", 1, true, "stick", 3, "coal", 1, "oak_log", 3);
+        r("lightning_rod", 1, true, "copper_ingot", 3);
+        r("coal_block", 1, true, "coal", 9);
+        r("campfire", 1, true, "stick", 3, "coal", 1, "#logs", 3);
         r("redstone_torch", 1, false, "stick", 1, "redstone", 1);
         r("lever", 1, false, "stick", 1, "cobblestone", 1);
         r("repeater", 1, true, "redstone_torch", 2, "redstone", 1, "stone", 3);
         r("comparator", 1, true, "redstone_torch", 3, "quartz", 1, "stone", 3);
-        r("piston", 1, true, "oak_planks", 3, "cobblestone", 4, "iron_ingot", 1, "redstone", 1);
+        r("piston", 1, true, "#planks", 3, "cobblestone", 4, "iron_ingot", 1, "redstone", 1);
         r("sticky_piston", 1, false, "piston", 1, "slime_ball", 1);
         r("observer", 1, true, "cobblestone", 6, "redstone", 2, "quartz", 1);
         r("dropper", 1, true, "cobblestone", 7, "redstone", 1);
         r("dispenser", 1, true, "cobblestone", 7, "redstone", 1, "bow", 1);
         r("redstone_lamp", 1, true, "redstone", 4, "glowstone", 1);
-        r("note_block", 1, true, "oak_planks", 8, "redstone", 1);
-        r("composter", 1, true, "oak_slab", 7);
-        r("white_bed", 1, true, "white_wool", 3, "oak_planks", 3);
+        r("note_block", 1, true, "#planks", 8, "redstone", 1);
+        family("stone", "stone", false);
+        family("cobblestone", "cobblestone", true);
+        family("mossy_cobblestone", "mossy_cobblestone", true);
+        family("stone_bricks", "stone_brick", true);
+        family("mossy_stone_bricks", "mossy_stone_brick", true);
+        family("andesite", "andesite", true);
+        family("diorite", "diorite", true);
+        family("granite", "granite", true);
+        family("polished_andesite", "polished_andesite", false);
+        family("polished_diorite", "polished_diorite", false);
+        family("polished_granite", "polished_granite", false);
+        family("cobbled_deepslate", "cobbled_deepslate", true);
     }
 
-    /** The recipe for an item, wooden things worked out for any kind of wood. */
+    /** The recipe for an item; wooden things are made from that same kind of wood. */
     static Recipe recipeFor(String item) {
         Recipe r = RECIPES.get(item);
         if (r != null) return r;
@@ -534,13 +685,24 @@ final class BlueprintBuilder {
         };
     }
 
-    /** Can it get this one way or another (recipe, furnace, digging)? */
+    /** Can it get this one way or another (recipe, furnace, digging), in the Overworld? */
     static boolean obtainable(String item, int depth) {
+        return obtainable(item, depth, false);
+    }
+
+    /** {@code nether}: it's in the Nether (crimson and warped trees grow there, nowhere else). */
+    static boolean obtainable(String item, int depth, boolean nether) {
         if (depth > 6) return false;
+        if (item.equals("#logs") || item.endsWith("_bed")) return true;
+        String[] w = Rules.wood(item);
+        if (w != null) {
+            Woods.Wood wood = Woods.get(w[0]);
+            if (wood != null && wood.nether() != nether) return false;
+        }
         if (gatherTarget(item) != null || SMELTED.containsKey(item)) return true;
         Recipe r = recipeFor(item);
         if (r == null) return false;
-        for (String i : r.in().keySet()) if (!obtainable(i, depth + 1)) return false;
+        for (String i : r.in().keySet()) if (!obtainable(i, depth + 1, nether)) return false;
         return true;
     }
 
@@ -550,11 +712,12 @@ final class BlueprintBuilder {
 
     /**
      * Gets {@code want} of {@code item} into the pockets: chests first, then the recipe (making
-     * its ingredients the same way), the furnace, or digging. True if it has them. Job thread.
+     * its ingredients the same way), the furnace, or digging and chopping (the right kind of
+     * tree for a kind of wood). True if it has them. Job thread.
      */
     static boolean make(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, String item, int want, int depth,
                         Predicate<String> keep) throws InterruptedException {
-        Predicate<String> test = itemTest(item);
+        Predicate<String> test = testFor(bot, item);
         int have = onServer(server, () -> Gathering.countOf(bot, test), 0);
         if (have >= want) return true;
         if (depth > 6 || !SurvivalBrain.canContinue(b)) return false;
@@ -562,25 +725,25 @@ final class BlueprintBuilder {
         if (have >= want) return true;
         Recipe r = recipeFor(item);
         try {
+            if (item.endsWith("_bed")) {
+                House.ensureBed(server, bot, b);
+                return onServer(server, () -> Gathering.countOf(bot, test), 0) >= want;
+            }
             if (r == null) {
                 String phrase = SMELTED.get(item);
                 if (phrase != null) {
                     Smelting.Recipe sr = Smelting.recipeFor(phrase);
                     if (sr != null) Smelting.smeltFor(server, bot, b, sr, want - have, null);
                 } else {
-                    MiningSkills.Target t = gatherTarget(item);
+                    MiningSkills.Target t = item.equals("#logs") ? MiningSkills.resolve("wood") : gatherTarget(item);
                     if (t == null) return false;
                     if (depth == 0 || want - have >= 4) {
-                        SurvivalBrain.maybeSay(server, b, HumanChat.pick("need " + (want - have) + " " + label(item) + ", gonna go get some",
-                                "getting " + label(item) + " for the build"), 0.8);
+                        String[] w = Rules.wood(item);
+                        String what = w != null && w[1].equals("log") ? w[0].replace('_', ' ') + " logs (" + Woods.look(w[0]) + ")" : label(item);
+                        SurvivalBrain.maybeSay(server, b, HumanChat.pick("need " + (want - have) + " " + what + ", gonna go get some",
+                                "getting " + what + " for the build"), 0.8);
                     }
                     MiningSkills.collect(server, bot, b, t, want - have, true);
-                    // a kind of tree that isn't around here: any wood does
-                    String[] w = Rules.wood(item);
-                    if (w != null && w[1].equals("log") && onServer(server, () -> Gathering.countOf(bot, test), 0) < want) {
-                        MiningSkills.Target any = MiningSkills.resolve("wood");
-                        if (any != null) MiningSkills.collect(server, bot, b, any, want - onServer(server, () -> Gathering.countOf(bot, test), 0), true);
-                    }
                 }
                 return onServer(server, () -> Gathering.countOf(bot, test), 0) >= want;
             }
@@ -594,14 +757,13 @@ final class BlueprintBuilder {
                 if (!make(server, bot, b, "crafting_table", 1, depth + 1, keep)) return false;
             }
             for (Map.Entry<String, Integer> e : r.in().entrySet()) {
-                // what the other ingredients and the table already use of the same thing isn't double counted: separate items
                 make(server, bot, b, e.getKey(), e.getValue() * crafts, depth + 1, keep);
                 if (!SurvivalBrain.canContinue(b)) return false;
             }
             onServer(server, () -> {
                 for (int c = 0; c < crafts; c++) {
                     for (Map.Entry<String, Integer> e : r.in().entrySet()) {
-                        if (Gathering.countOf(bot, itemTest(e.getKey())) < e.getValue()) return null;
+                        if (Gathering.countOf(bot, testFor(bot, e.getKey())) < e.getValue()) return null;
                     }
                     if (!Gathering.roomFor(bot, test, r.out())) {
                         Storage.makeRoom(bot, 2);
@@ -609,12 +771,16 @@ final class BlueprintBuilder {
                     }
                     String madeOf = null;
                     for (Map.Entry<String, Integer> e : r.in().entrySet()) {
-                        String first = SurvivalBrain.take(bot, itemTest(e.getKey()), e.getValue());
+                        String first = SurvivalBrain.take(bot, testFor(bot, e.getKey()), e.getValue());
                         if (madeOf == null && first != null && Rules.wood(first) != null) madeOf = first;
                     }
-                    // spruce planks make spruce stairs, oak planks oak stairs
-                    String[] out = Rules.wood(item), from = madeOf == null ? null : Rules.wood(madeOf);
-                    SurvivalBrain.give(bot, out != null && from != null ? Rules.woodPath(from[0], out[1]) : item, r.out());
+                    String out = item;
+                    if (item.startsWith("#")) { // any-wood planks/slabs come out as the wood they were made of
+                        String[] from = madeOf == null ? null : Rules.wood(madeOf);
+                        String kind = item.equals("#planks") ? "planks" : "slab";
+                        out = Rules.woodPath(from == null ? "oak" : from[0], kind);
+                    }
+                    SurvivalBrain.give(bot, out, r.out());
                 }
                 Motions.swingArm(bot);
                 return null;
@@ -627,13 +793,13 @@ final class BlueprintBuilder {
 
     private static final Set<String> DIGGABLE = Set.of("dirt", "sand", "red_sand", "gravel", "cobblestone", "cobbled_deepslate",
             "netherrack", "soul_sand", "soul_soil", "sugar_cane", "cactus", "bamboo", "blackstone", "coal", "redstone", "quartz",
-            "raw_iron");
+            "raw_iron", "andesite", "diorite", "granite", "calcite", "tuff", "moss_block", "clay", "basalt");
 
-    /** Where to get it out in the world (dig, chop, cut), or null. */
+    /** Where to get it out in the world (dig, chop, cut), or null. Logs: that kind of tree. */
     static MiningSkills.Target gatherTarget(String item) {
         String[] w = Rules.wood(item);
         if (w != null && w[1].equals("log") && !w[0].equals("bamboo")) {
-            return w[0].equals("oak") ? MiningSkills.resolve("wood") : MiningSkills.resolve(w[0].replace('_', ' '));
+            return MiningSkills.resolve(w[0].replace('_', ' '));
         }
         if (!DIGGABLE.contains(item)) return null;
         return switch (item) {
@@ -644,11 +810,125 @@ final class BlueprintBuilder {
         };
     }
 
-    /** Chests first, then craft, smelt or dig what it can. Returns what's still missing. Job thread. */
+    private record Seen(boolean trees, long at, BlockPos where) {}
+
+    private static final Map<String, Seen> TREES_SEEN = new ConcurrentHashMap<>();
+
+    /** Is there a tree of this kind within reach of a walk? (Remembered for a few minutes: it's a big look.) Server thread. */
+    private static boolean treesNear(ServerPlayer bot, SurvivalBrain.Brain b, String species) {
+        String key = b.name + "|" + species;
+        Seen s = TREES_SEEN.get(key);
+        BlockPos here = bot.blockPosition();
+        if (s != null && System.currentTimeMillis() - s.at() < 5 * 60_000L && s.where().distSqr(here) < 32 * 32) return s.trees();
+        MiningSkills.Target t = MiningSkills.resolve(species.replace('_', ' '));
+        boolean found = false;
+        if (t != null) {
+            try {
+                found = MiningSkills.findTarget(bot, b, t, Protection.scan(bot, 48), 0) != null;
+            } catch (Throwable ex) {
+                found = false;
+            }
+        }
+        TREES_SEEN.put(key, new Seen(found, System.currentTimeMillis(), here));
+        return found;
+    }
+
+    /**
+     * The exact block can't be had: picks the closest-looking one it can get and says so. Wood
+     * goes by colour (no dark oak around: spruce, the next darkest brown); other blocks by
+     * {@link #LOOKALIKES}. Remembered with the build, and swapped back once the real thing turns up.
+     */
+    static void standIn(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, Placed p, String item, boolean nether) {
+        String[] w = Rules.wood(item);
+        if (w != null) {
+            String sp = w[0];
+            if (p.swaps().containsKey("wood:" + sp) || p.swaps().containsKey("upgraded:wood:" + sp)) return;
+            for (String t : Woods.closest(sp)) {
+                Woods.Wood tw = Woods.get(t);
+                if (tw == null || tw.nether() != nether) continue;
+                boolean ok = onServer(server, () -> Gathering.countOf(bot, ofSpecies(t)) + Storage.stockOf(bot.level(), ofSpecies(t)) > 0
+                        || treesNear(bot, b, t), false);
+                if (!ok) continue;
+                p.swaps().put("wood:" + sp, t);
+                Woods.Wood sw = Woods.get(sp);
+                String why = sw != null && sw.nether() ? " (it only grows in the nether)" : " anywhere near here";
+                HumanChat.say(server, b.name, "no " + sp.replace('_', ' ') + " trees" + why + ", so i'm using " + t.replace('_', ' ')
+                        + " instead: " + Woods.look(t) + " where it should be " + Woods.look(sp) + ". bring me some "
+                        + sp.replace('_', ' ') + (sw != null && sw.nether() ? " stems" : " logs") + " and i'll swap it back in");
+                return;
+            }
+            return;
+        }
+        if (p.swaps().containsKey(item) || p.swaps().containsKey("upgraded:" + item)) return;
+        List<String> opts = LOOKALIKES.get(item);
+        if (opts == null) return;
+        for (String o : opts) {
+            boolean ok = obtainable(o, 0, nether) || onServer(server, () -> Gathering.countOf(bot, o::equals)
+                    + Storage.stockOf(bot.level(), o::equals) > 0, false);
+            if (!ok) continue;
+            p.swaps().put(item, o);
+            HumanChat.say(server, b.name, "can't get " + label(item) + ", using " + label(o)
+                    + " instead, it's the closest look i can make. put some " + label(item) + " in a chest and i'll swap them in");
+            return;
+        }
+    }
+
+    /** Stand-ins whose real block is now in the pockets or a chest: dropped, so the real thing goes in. Job thread. */
+    static void upgradeStandIns(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, Placed p) {
+        for (String key : new ArrayList<>(p.swaps().keySet())) {
+            if (key.equals(LEGACY)) continue;
+            Predicate<String> real = key.startsWith("wood:") ? ofSpecies(key.substring(5)) : key::equals;
+            // enough of the real thing for every block the stand-in took (a log makes 4 planks' worth)
+            int cells = 0;
+            Schematic s = p.plan();
+            for (int y = 0; y < s.sy; y++) for (int z = 0; z < s.sz; z++) for (int x = 0; x < s.sx; x++) {
+                State st = s.at(x, y, z);
+                if (st == null || Rules.decorative(st.path())) continue;
+                String[] w = Rules.wood(st.path());
+                if (key.startsWith("wood:") ? w != null && w[0].equals(key.substring(5)) : st.path().equals(key)) cells++;
+            }
+            final int need = cells;
+            boolean have = onServer(server, () -> {
+                int n = 0;
+                Predicate<String> logs = it -> {
+                    if (!key.startsWith("wood:") || !real.test(it)) return false;
+                    String[] w = Rules.wood(it);
+                    return w != null && w[1].equals("log");
+                };
+                n += Gathering.countOf(bot, real) + Storage.stockOf(bot.level(), real);
+                n += 3 * (Gathering.countOf(bot, logs) + Storage.stockOf(bot.level(), logs));
+                return n >= need;
+            }, false);
+            if (!have) continue;
+            p.swaps().put("upgraded:" + key, "1");
+            String was = p.swaps().remove(key);
+            String name = key.startsWith("wood:") ? key.substring(5).replace('_', ' ') : label(key);
+            if (was == null) continue;
+            HumanChat.say(server, b.name, "got " + name + " now, gonna swap it in for the " + label(was) + " i used");
+        }
+    }
+
+    /**
+     * Chests first, then craft, smelt, dig or chop what it can. What it can't get gets a stand-in
+     * that looks close. Returns what's still missing. Job thread.
+     */
     static Map<String, Integer> gather(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, Map<String, Integer> needs,
-                                       Predicate<String> keep) throws InterruptedException {
+                                       Predicate<String> keep, Placed p) throws InterruptedException {
         Map<String, Integer> missing = onServer(server, () -> shortfall(bot, needs), null);
         if (missing == null || missing.isEmpty()) return missing == null ? Map.of() : missing;
+        Set<String> reserved = new HashSet<>();
+        reserved.addAll(needs.keySet()); // the exact blocks the build places (logs it can always chop more of)
+        RESERVED.put(bot.getUUID(), reserved);
+        try {
+            return gatherAll(server, bot, b, needs, keep, p, missing);
+        } finally {
+            RESERVED.remove(bot.getUUID());
+        }
+    }
+
+    private static Map<String, Integer> gatherAll(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, Map<String, Integer> needs,
+                                                  Predicate<String> keep, Placed p, Map<String, Integer> missing) throws InterruptedException {
+        boolean nether = onServer(server, () -> Home.dim(bot.level()).contains("nether"), false);
         for (Map.Entry<String, Integer> e : missing.entrySet()) {
             if (!SurvivalBrain.canContinue(b)) break;
             Storage.withdraw(server, bot, b, itemTest(e.getKey()), e.getValue(), label(e.getKey()));
@@ -658,10 +938,20 @@ final class BlueprintBuilder {
             if (!SurvivalBrain.canContinue(b)) break;
             String item = e.getKey();
             int n = e.getValue();
+            if (!obtainable(item, 0, nether)) {
+                if (p != null) standIn(server, bot, b, p, item, nether);
+                continue;
+            }
             if (n > MAX_GATHER) continue;
-            if (!obtainable(item, 0)) continue; // say so at the end
             int have = onServer(server, () -> Gathering.countOf(bot, itemTest(item)), 0);
             make(server, bot, b, item, have + n, 0, keep);
+            int got = onServer(server, () -> Gathering.countOf(bot, itemTest(item)), 0) - have;
+            String[] w = Rules.wood(item);
+            if (p != null && w != null && got < n / 4 && !onServer(server, () -> treesNear(bot, b, w[0]), true)) {
+                standIn(server, bot, b, p, item, nether); // that kind of tree just isn't around
+            } else if (p != null && w == null && got < n / 4 && LOOKALIKES.containsKey(item)) {
+                standIn(server, bot, b, p, item, nether); // couldn't find it (calcite, moss...): the closest look
+            }
         }
         return onServer(server, () -> shortfall(bot, needs), missing);
     }
@@ -694,7 +984,7 @@ final class BlueprintBuilder {
             State st = s.at(x, y, z);
             if (st == null) continue;
             switch (Rules.kind(st)) {
-                case BLOCK -> { for (Rules.Need n : Rules.items(st)) needs.merge(poolKey(n.item()), n.count(), Integer::sum); }
+                case BLOCK -> { for (Rules.Need n : Rules.items(st)) needs.merge(n.item(), n.count(), Integer::sum); }
                 case WATER -> water++;
                 case LAVA -> needs.merge("lava_bucket", 1, Integer::sum);
                 case UNOBTAINABLE -> unob.merge(st.path(), 1, Integer::sum);
@@ -844,9 +1134,8 @@ final class BlueprintBuilder {
         }
         if (Rules.isGravity(plan.path()) && Building.isFree(level, pos.below()) && p.contains(pos.below())) return SKIP; // would just fall
         State target = Rules.placeState(plan);
-        if (!using.isEmpty() && !using.get(0).equals(needs.get(0).item())) {
-            String[] used = Rules.wood(using.get(0)), planned = Rules.wood(target.path());
-            if (used != null && planned != null) target = target.withId(Rules.woodPath(used[0], planned[1])); // oak for spruce
+        if (target.path().endsWith("_bed") && !using.isEmpty() && using.get(0).endsWith("_bed")) {
+            target = target.withId(using.get(0)); // the bed it has, in its own colour
         }
         // plain cubes go in like a player places them
         if (Rules.byHand(plan) && target.path().equals(plan.path())) {
@@ -1139,36 +1428,81 @@ final class BlueprintBuilder {
         return best;
     }
 
-    /** Items a build uses: kept out of crafting and the chests while it's going. */
-    private static Predicate<String> keepFor(Schematic s) {
-        Set<String> items = new HashSet<>(List.of("bucket", "water_bucket", "lava_bucket"));
+    /**
+     * Items a build uses (stand-ins included): kept out of crafting and the chests while it's
+     * going. Re-read from the plan each time, so stand-ins agreed later are kept too.
+     */
+    private static Predicate<String> keepFor(Placed p) {
+        Set<String> items = ConcurrentHashMap.newKeySet();
+        Runnable fill = () -> {
+            Set<String> now = new HashSet<>(List.of("bucket", "water_bucket", "lava_bucket"));
+            Schematic s = p.plan();
+            for (int y = 0; y < s.sy; y++) for (int z = 0; z < s.sz; z++) for (int x = 0; x < s.sx; x++) {
+                State st = p.local(x, y, z);
+                if (st != null && Rules.kind(st) == Rules.Kind.BLOCK) for (Rules.Need n : Rules.items(st)) now.add(n.item());
+            }
+            for (String i : new ArrayList<>(now)) {
+                String[] w = Rules.wood(i);
+                if (w != null) now.add(Rules.woodPath(w[0], "log")); // and the logs it's made from
+            }
+            items.clear();
+            items.addAll(now);
+        };
+        fill.run();
+        final int[] swapsSeen = {p.swaps().size()};
+        return it -> {
+            if (p.swaps().size() != swapsSeen[0]) { swapsSeen[0] = p.swaps().size(); fill.run(); }
+            return items.contains(it);
+        };
+    }
+
+    /** How a build went: where it is, done or not, and how much of it (decoration aside) is still missing. */
+    record Result(Placed placed, boolean complete, int remaining, int total) {
+        double progress() { return total <= 0 ? 1.0 : Math.max(0, 1.0 - (double) Math.max(0, remaining) / total); }
+    }
+
+    /** Blocks in a design that count (not air, not "don't care", not decoration). */
+    static int essentialCells(Schematic s) {
+        int n = 0;
         for (int y = 0; y < s.sy; y++) for (int z = 0; z < s.sz; z++) for (int x = 0; x < s.sx; x++) {
             State st = s.at(x, y, z);
-            if (st != null && Rules.kind(st) == Rules.Kind.BLOCK) for (Rules.Need n : Rules.items(st)) items.add(n.item());
+            if (st == null) continue;
+            Rules.Kind k = Rules.kind(st);
+            if (k == Rules.Kind.AIR || k == Rules.Kind.KEEP || Rules.decorative(st.path())) continue;
+            n++;
         }
-        boolean planks = items.stream().anyMatch(i -> i.endsWith("_planks"));
-        boolean logs = items.stream().anyMatch(i -> i.endsWith("_log"));
-        return p -> items.contains(p) || (planks && p.endsWith("_planks")) || (logs && p.endsWith("_log"));
+        return n;
+    }
+
+    private static Blueprints.Build record(Blueprints.Build rec, boolean done, Placed p) {
+        return new Blueprints.Build(rec.bot(), rec.dim(), rec.file(), rec.x(), rec.y(), rec.z(), rec.rot(), rec.sx(), rec.sy(),
+                rec.sz(), done, encodeSwaps(p.swaps()));
     }
 
     /** Job: build a design (or carry on with one: {@code previous}). */
     static void build(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, Blueprints.Entry e, Spot spot,
                       Blueprints.Build previous) throws InterruptedException {
+        buildFor(server, bot, b, e, spot, previous);
+    }
+
+    /** Same, telling the caller how it went (null if it never started). Job thread. */
+    static Result buildFor(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, Blueprints.Entry e, Spot spot,
+                           Blueprints.Build previous) throws InterruptedException {
         Schematic base;
         try {
             base = Blueprints.plan(e);
         } catch (IOException | RuntimeException ex) {
             HumanChat.say(server, b.name, "can't read " + e.fileName() + ": " + ex.getMessage());
-            return;
+            return null;
         }
         int blocks = base.solidCount();
         if (blocks == 0) {
             HumanChat.say(server, b.name, "the " + e.name() + " schematic is empty");
-            return;
+            return null;
         }
         if (blocks > MAX_BLOCKS) {
             HumanChat.say(server, b.name, "the " + e.name() + " is way too big for me (" + blocks + " blocks)");
-            return;
+            return null;
         }
         Placed p = onServer(server, () -> site(bot, base, e, spot), null);
         if (p == null) {
@@ -1176,22 +1510,30 @@ final class BlueprintBuilder {
                     ? HumanChat.pick("can't find a flat enough spot for the " + e.name() + " around here",
                     "no good spot for the " + e.name() + " nearby. tell me where: stand there and say \"build the " + e.name() + " here\"")
                     : "can't build it there, it'd stick out of the world");
-            return;
+            return null;
         }
         if (!p.dim().equals(onServer(server, () -> Home.dim(bot.level()), ""))) {
             HumanChat.say(server, b.name, "that build is in another dimension");
-            return;
+            return null;
+        }
+        if (previous != null) {
+            p.swaps().putAll(decodeSwaps(previous.swaps()));
+            upgradeStandIns(server, bot, b, p);
         }
         String me = b.name.toLowerCase(Locale.ROOT);
         Blueprints.Build rec = new Blueprints.Build(previous != null ? previous.bot() : me, p.dim(), e.fileName(),
-                p.origin().getX(), p.origin().getY(), p.origin().getZ(), p.rot(), p.plan().sx, p.plan().sy, p.plan().sz, false);
+                p.origin().getX(), p.origin().getY(), p.origin().getZ(), p.rot(), p.plan().sx, p.plan().sy, p.plan().sz, false,
+                encodeSwaps(p.swaps()));
         Blueprints.remember(rec);
-        Predicate<String> keep = keepFor(p.plan());
+        int total = essentialCells(base);
+        Predicate<String> keep = keepFor(p);
         SurvivalBrain.keep(bot, keep);
         try {
             if (spot.kind() != 3) {
+                String woods = Woods.paletteLine(Woods.palette(base.blockCounts()), 3);
                 HumanChat.say(server, b.name, "putting the " + e.name() + " at " + p.origin().getX() + " " + (p.origin().getY() + e.ground())
-                        + " " + p.origin().getZ() + " (" + p.plan().sx + "x" + p.plan().sy + "x" + p.plan().sz + ", " + blocks + " blocks)");
+                        + " " + p.origin().getZ() + " (" + p.plan().sx + "x" + p.plan().sy + "x" + p.plan().sz + ", " + blocks + " blocks)"
+                        + (woods.isEmpty() ? "" : ". the wood is " + woods + ", so i need those trees"));
             }
             // room in the pockets for the materials
             if (onServer(server, () -> Storage.usedSlots(bot) > 22 && Home.get(bot) != null, false)) {
@@ -1209,10 +1551,17 @@ final class BlueprintBuilder {
                     Blueprints.forget(rec);
                     HumanChat.say(server, b.name, "there's a build in the way there (" + w.manMadeWhat + "), not gonna tear that down."
                             + " pick another spot: stand where you want it and say \"build the " + e.name() + " here\"");
-                    return;
+                    return null;
                 }
                 if (!w.needs.isEmpty()) {
-                    missing = gather(server, bot, b, w.needs, keep);
+                    int swapsBefore = p.swaps().size();
+                    missing = gather(server, bot, b, w.needs, keep, p);
+                    if (p.swaps().size() != swapsBefore) {
+                        if (Blueprints.known(rec)) Blueprints.remember(record(rec, false, p));
+                        w = scan(server, bot, p); // stand-ins agreed: plan with those
+                        if (w == null) break;
+                        missing = gather(server, bot, b, w.needs, keep, p);
+                    }
                     if (round == 0 && !missing.isEmpty()) {
                         HumanChat.say(server, b.name, "don't have everything: missing " + listOf(missing, 5)
                                 + ". gonna build what i can");
@@ -1231,35 +1580,41 @@ final class BlueprintBuilder {
                 done += placeAll(server, bot, b, p, w.solid, fails, noItems);
                 done += fluidAll(server, bot, b, p, w.fluid, fails, noItems);
                 done += placeAll(server, bot, b, p, w.attach, fails, noItems);
+                done += placeAll(server, bot, b, p, w.decor, fails, noItems);
                 SurvivalBrain.pickUpNearbyItems(server, bot, 8, false);
                 LOGGER.info("[builder] {} {} round {}: {} done, {} left", b.name, e.name(), round, done, w.size() - done);
                 if (done == 0) break;
             }
-            if (!SurvivalBrain.canContinue(b)) return;
+            if (!SurvivalBrain.canContinue(b)) {
+                Work now = scan(server, bot, p);
+                return new Result(p, false, now == null ? total : now.toPlace(), total);
+            }
             Work left = scan(server, bot, p);
-            int remaining = left == null ? -1 : left.size();
-            boolean complete = remaining == 0 && left.unloaded == 0;
-            if (Blueprints.known(rec)) Blueprints.remember(new Blueprints.Build(rec.bot(), rec.dim(), rec.file(), rec.x(), rec.y(), rec.z(), rec.rot(),
-                    rec.sx(), rec.sy(), rec.sz(), complete));
+            int remaining = left == null ? total : left.toPlace();
+            boolean complete = left != null && left.essential() == 0 && left.unloaded == 0;
+            if (Blueprints.known(rec)) Blueprints.remember(record(rec, complete, p));
             String skipped = left != null && !left.unobtainable.isEmpty()
                     ? " (skipped " + listOf(left.unobtainable, 3) + ", can't get those in survival)" : "";
             if (complete) {
+                String decor = left.decor.isEmpty() ? "" : " (some flowers and leaves still to put in when i find them)";
                 HumanChat.say(server, b.name, HumanChat.pick("done! the " + e.name() + " is built", "the " + e.name() + " is finished")
-                        + skipped + (left != null && left.leftAlone > 0 ? ". left a chest or bed that was in the way" : "")
+                        + decor + skipped + (left.leftAlone > 0 ? ". left a chest or bed that was in the way" : "")
                         + (e.note().isBlank() ? "" : ". " + e.note()));
-                return;
+                return new Result(p, true, 0, total);
             }
             Map<String, Integer> still = left == null ? Map.of() : onServer(server, () -> shortfall(bot, left.needs), Map.of());
             Map<String, Integer> report = new TreeMap<>(still);
             if (left != null && left.water > 0 && onServer(server, () -> Gathering.countOf(bot, "water_bucket"::equals) == 0
                     && Gathering.countOf(bot, "bucket"::equals) == 0, true)) report.put("bucket", 1);
             if (!report.isEmpty()) {
-                HumanChat.say(server, b.name, "built what i could. still need " + listOf(report, 6)
+                HumanChat.say(server, b.name, "built what i could (" + (int) Math.round(new Result(p, false, remaining, total).progress() * 100)
+                        + "%). still need " + listOf(report, 6)
                         + ". put them in a chest or give them to me and say \"continue the build\"" + skipped);
             } else {
                 HumanChat.say(server, b.name, "mostly done, couldn't get to " + remaining + " spots. say \"continue the build\" and i'll try again"
                         + skipped);
             }
+            return new Result(p, false, remaining, total);
         } finally {
             SurvivalBrain.keep(bot, null);
         }
@@ -1384,7 +1739,7 @@ final class BlueprintBuilder {
                 return;
             }
         }
-        Predicate<String> keep = keepFor(p.plan());
+        Predicate<String> keep = keepFor(p);
         SurvivalBrain.keep(bot, keep);
         try {
             List<BlockPos> targets = onServer(server, () -> harvestable(bot.level(), p, cells), List.of());

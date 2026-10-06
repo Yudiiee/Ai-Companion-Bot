@@ -41,12 +41,14 @@ public final class Blueprints {
 
     static final String[] EXTENSIONS = {".schem", ".schematic", ".nbt", ".litematic"};
     /** Designs that ship with the mod (put in the folder the first time, never again if deleted). */
-    static final String[] STARTERS = {"sugar_cane_farm", "cactus_farm", "bamboo_farm", "iron_farm"};
+    static final String[] STARTERS = {"sugar_cane_farm", "cactus_farm", "bamboo_farm", "iron_farm", "medieval_house_1",
+            "medieval_house_2", "medieval_house_3", "medieval_house_4", "medieval_house_5", "medieval_house_6"};
 
     private Blueprints() {}
 
     /** A design in the folder. {@code ground}: which layer is level with the ground. {@code front}: north/east/south/west. */
-    public record Entry(String name, Path file, List<String> aliases, String about, int ground, String front, String note) {
+    public record Entry(String name, Path file, List<String> aliases, String about, int ground, String front, String note,
+                        boolean starter) {
         String fileName() { return file.getFileName().toString(); }
     }
 
@@ -133,6 +135,7 @@ public final class Blueprints {
         int ground = 0;
         String front = "south";
         String note = "";
+        boolean starter = false;
         if (Files.isRegularFile(side)) {
             try {
                 for (String line : Files.readAllLines(side, StandardCharsets.UTF_8)) {
@@ -146,6 +149,7 @@ public final class Blueprints {
                         }
                         case "about", "description" -> about = v;
                         case "note", "when done", "after" -> note = v;
+                        case "starter" -> starter = v.toLowerCase(Locale.ROOT).matches("yes|true|1");
                         case "ground" -> {
                             try { ground = Math.max(0, Integer.parseInt(v)); } catch (NumberFormatException ignored) { }
                         }
@@ -158,7 +162,7 @@ public final class Blueprints {
                 }
             } catch (IOException ignored) { }
         }
-        return new Entry(name, file, List.copyOf(aliases), about, ground, front, note);
+        return new Entry(name, file, List.copyOf(aliases), about, ground, front, note, starter);
     }
 
     private static final Map<Path, SoftReference<Object[]>> PLANS = new ConcurrentHashMap<>();
@@ -186,7 +190,8 @@ public final class Blueprints {
     private static final java.util.Set<String> FILLER = java.util.Set.of("a", "an", "the", "my", "our", "your", "me", "us",
             "some", "another", "new", "one", "more", "that", "this", "big", "small", "little", "simple", "basic");
     private static final java.util.Set<String> GENERIC = java.util.Set.of("farm", "farms", "build", "building", "structure",
-            "machine", "design", "schematic", "schem", "thing", "contraption", "generator");
+            "machine", "design", "schematic", "schem", "thing", "contraption", "generator", "house", "home", "hut", "cabin",
+            "shelter", "base", "shack");
 
     static String norm(String s) {
         String t = s.toLowerCase(Locale.ROOT).replace("sugarcane", "sugar cane").replace("cacti", "cactus")
@@ -254,7 +259,12 @@ public final class Blueprints {
 
     /** A build: the box it fills ({@code x,y,z} is its low corner), the turn it was placed with, done or not. */
     public record Build(String bot, String dim, String file, int x, int y, int z, int rot, int sx, int sy, int sz,
-                        boolean done) {
+                        boolean done, String swaps) {
+        /** Stand-ins agreed for this build ("wood:warped>dark_oak;calcite>diorite"). */
+        public Build {
+            swaps = swaps == null ? "" : swaps;
+        }
+
         boolean inside(BlockPos p, int margin, int above) {
             return p.getX() >= x - margin && p.getX() < x + sx + margin && p.getZ() >= z - margin && p.getZ() < z + sz + margin
                     && p.getY() >= y - margin && p.getY() < y + sy + margin + above;
@@ -285,11 +295,11 @@ public final class Blueprints {
             if (!Files.exists(f)) return;
             for (String line : Files.readAllLines(f, StandardCharsets.UTF_8)) {
                 String[] p = line.split("\t");
-                if (p.length != 11) continue;
+                if (p.length != 11 && p.length != 12) continue;
                 try {
                     BUILDS.add(new Build(p[0], p[1], p[10], Integer.parseInt(p[2]), Integer.parseInt(p[3]), Integer.parseInt(p[4]),
                             Integer.parseInt(p[5]), Integer.parseInt(p[6]), Integer.parseInt(p[7]), Integer.parseInt(p[8]),
-                            p[9].equals("done")));
+                            p[9].equals("done"), p.length == 12 ? (p[11].equals("-") ? "" : p[11]) : BlueprintBuilder.LEGACY + ">wood"));
                 } catch (NumberFormatException ignored) { }
             }
         } catch (Exception e) {
@@ -304,7 +314,7 @@ public final class Blueprints {
                 sb.append(b.bot()).append('\t').append(b.dim()).append('\t').append(b.x()).append('\t').append(b.y()).append('\t')
                         .append(b.z()).append('\t').append(b.rot()).append('\t').append(b.sx()).append('\t').append(b.sy())
                         .append('\t').append(b.sz()).append('\t').append(b.done() ? "done" : "building").append('\t')
-                        .append(b.file()).append('\n');
+                        .append(b.file()).append('\t').append(b.swaps().isEmpty() ? "-" : b.swaps()).append('\n');
             }
             Files.writeString(Home.worldFile("builds.txt"), sb.toString(), StandardCharsets.UTF_8);
         } catch (Exception e) {
@@ -552,6 +562,10 @@ public final class Blueprints {
                     Entry e = byFile(target.file());
                     if (e == null) {
                         HumanChat.say(server, brain.name, "can't find " + target.file() + " in the schematics folder anymore");
+                        return;
+                    }
+                    if (e.starter() && target.bot().equals(me)) {
+                        StarterHouse.build(server, b0, brain, null); // its own house: moves in when it's up
                         return;
                     }
                     BlueprintBuilder.build(server, b0, brain, e, BlueprintBuilder.Spot.resume(target), target);

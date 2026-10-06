@@ -1,0 +1,6 @@
+name: medieval manor
+aliases: medieval house 6, house 6, manor
+about: Starter house 6 of 6 from a medieval village by ajmed. Spruce and dark oak timber, stone and calcite walls.
+ground: 0
+front: south
+starter: yes

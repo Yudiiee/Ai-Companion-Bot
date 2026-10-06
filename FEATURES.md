@@ -174,6 +174,28 @@ and makes each companion feel like another person playing with you.
 - Eating: when food is 14 or lower, or when it's hurt and not full (so health comes back).
 - Saved per bot, per world (`<world>/ai-companion/farms.txt`). Seeds aren't thrown out as junk once there's a farm.
 
+**Starter houses** (six medieval designs)
+- Each companion builds its own house from the starter designs (side file `starter: yes`): the first bot the
+  medieval cottage, the next the townhouse, then the inn, workshop, hall and manor (from a village by ajmed).
+- It picks a flat spot (trees on it get chopped), builds it like any design, and moves in once 60% is up. The
+  design itself says where inside is, the middle of the ground floor (where it goes at night), where the barrels
+  and chests are and where the bed is; it adds two chests and a bed if the design has none. It keeps building in
+  the daytime until the house is done. Can't get far (no trees around)? It lives in the small classic house
+  meanwhile. A bot that already had the classic house gets a designed one too.
+- `build a house` builds the bot's starter house.
+
+**Trees and wood**
+- It knows the twelve woods: which tree each comes from, where it grows and what colour the planks, bark and
+  stripped logs are. Ask "what kind of tree is that" (it looks around you), "where do i find cherry wood",
+  "what woods are there".
+- Builds use the exact wood: it chops spruce for spruce, dark oak for dark oak, and says what a design needs
+  ("the wood is spruce (medium brown) and dark oak (deep chocolate brown)").
+- When a wood can't be had (crimson and warped only grow in the Nether; no tree of that kind near), it uses the
+  closest-looking one it can get (colour compared the way the eye sees it), says so, and swaps the real wood in
+  when you put some in a chest. Same for blocks it can't make (prismarine -> mossy or plain stone bricks, calcite ->
+  diorite, stained glass -> glass). Flowers, leaves, vines and carpets are decoration: put in if it has them, and a
+  build without them still counts as done.
+
 **Building from schematics** (farms and anything else)
 - Every `.schem` (WorldEdit, Sponge v1-3), structure-block `.nbt` and `.litematic` in
   `config/ai-companion/schematics` is something the companions can build. Four designs come with the mod: a sugar
@@ -305,4 +327,4 @@ It hooks into: `AICompanion` (registration, hit reaction), `AICompanionClient` (
 `ItemHandoffHandler` (casual lines), `LLMServiceHandler` / `RAG2` / `PromptBuilder` (persona prompt),
 `NearbyBedSleepController` (reads the bed rule through the environment attribute system).
 
-Build: `./gradlew build` → `build/libs/ai-companion-1.2.0+26.3.jar`.
+Build: `./gradlew build` → `build/libs/ai-companion-1.3.0+26.3.jar`.

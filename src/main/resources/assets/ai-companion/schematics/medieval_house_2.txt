@@ -1,0 +1,6 @@
+name: medieval townhouse
+aliases: medieval house 2, house 2, townhouse
+about: Starter house 2 of 6 from a medieval village by ajmed. Spruce and dark oak timber, stone and calcite walls.
+ground: 0
+front: north
+starter: yes

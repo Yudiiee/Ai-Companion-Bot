@@ -27,12 +27,22 @@ public final class Home {
     private Home() {}
 
     /** A house and the dimension it's in. */
-    record Base(String dim, House.Site site) {
+    record Base(String dim, House.Site site, String design) {
 
-        BlockPos middle() { return site.middle(); }
+        Base(String dim, House.Site site) { this(dim, site, null); }
+
+        /** A starter house from a design: its layout (null for the small classic house). */
+        StarterHouse.Layout layout() { return StarterHouse.layout(design); }
+
+        BlockPos middle() {
+            StarterHouse.Layout l = layout();
+            return l != null ? l.middle() : site.middle();
+        }
 
         /** Standing inside the house? */
         boolean inside(BlockPos feet) {
+            StarterHouse.Layout l = layout();
+            if (l != null) return l.isInside(feet);
             int x0 = site.x0(), z0 = site.z0(), y = site.y(), m = site.size() - 2;
             return feet.getX() >= x0 + 1 && feet.getX() <= x0 + m && feet.getZ() >= z0 + 1 && feet.getZ() <= z0 + m
                     && feet.getY() >= y + 1 && feet.getY() <= y + 2;
@@ -43,6 +53,8 @@ public final class Home {
          * the walls, leaving the path from the door to the middle and the crafting table free.
          */
         List<BlockPos> chestSpots() {
+            StarterHouse.Layout l = layout();
+            if (l != null) return l.chestSpots();
             if (site.size() >= 7) {
                 // the two double chests on the back wall, then extra single chests beside them
                 int back = site.size() - 2, right = site.size() - 2;
@@ -155,7 +167,7 @@ public final class Home {
             for (String line : Files.readAllLines(f0, StandardCharsets.UTF_8)) {
                 // file order: bot dim x0 y z0 door size
                 String[] p = line.trim().split(" ");
-                if (p.length != 7) continue;
+                if (p.length != 7 && p.length != 8) continue;
                 Direction door = switch (p[5]) {
                     case "SOUTH" -> Direction.SOUTH;
                     case "EAST" -> Direction.EAST;
@@ -163,7 +175,7 @@ public final class Home {
                     default -> Direction.NORTH;
                 };
                 HOMES.put(p[0] + "|" + p[1], new Base(p[1], new House.Site(Integer.parseInt(p[2]), Integer.parseInt(p[4]),
-                        Integer.parseInt(p[3]), door, 0, Integer.parseInt(p[6]))));
+                        Integer.parseInt(p[3]), door, 0, Integer.parseInt(p[6])), p.length == 8 ? p[7] : null));
             }
         } catch (Exception ignored) { }
     }
@@ -178,7 +190,9 @@ public final class Home {
                 String dir = s.door() == Direction.SOUTH ? "SOUTH" : s.door() == Direction.EAST ? "EAST"
                         : s.door() == Direction.WEST ? "WEST" : "NORTH";
                 sb.append(bot).append(' ').append(h.dim()).append(' ').append(s.x0()).append(' ').append(s.y())
-                        .append(' ').append(s.z0()).append(' ').append(dir).append(' ').append(s.size()).append('\n');
+                        .append(' ').append(s.z0()).append(' ').append(dir).append(' ').append(s.size());
+                if (h.design() != null && !h.design().contains(" ")) sb.append(' ').append(h.design());
+                sb.append('\n');
             }
             Files.writeString(file(), sb.toString(), StandardCharsets.UTF_8);
         } catch (Exception ignored) { }
@@ -199,9 +213,20 @@ public final class Home {
         return out;
     }
 
-    static void set(ServerPlayer bot, House.Site site) {
+    /** Every bot's base, any dimension. */
+    static List<Base> all() {
         load();
-        HOMES.put(key(bot), new Base(dim(bot.level()), site));
+        return new java.util.ArrayList<>(HOMES.values());
+    }
+
+    static void set(ServerPlayer bot, House.Site site) {
+        set(bot, site, null);
+    }
+
+    /** {@code design}: a starter house built from a design ({@link StarterHouse.Design#encode()}). */
+    static void set(ServerPlayer bot, House.Site site, String design) {
+        load();
+        HOMES.put(key(bot), new Base(dim(bot.level()), site, design));
         BUILD_FAILURES.remove(who(bot));
         save();
     }
@@ -224,7 +249,7 @@ public final class Home {
         // (counts as a "player" job so the language model's own plan steps don't cut it short)
         SurvivalBrain.startJob(bot, "set up a base", true, (s, bt, bb) -> {
             try {
-                House.build(s, bt, bb, null);
+                StarterHouse.build(s, bt, bb, null);
             } finally {
                 BUILDING_SINCE.remove(name);
                 if (onServer(s, () -> get(bt), null) == null) BUILD_FAILURES.merge(name, 1, Integer::sum);
@@ -347,9 +372,9 @@ public final class Home {
                 Storage.storeAll(server, bot, b, false);
                 return true;
             }
-            if (lightCheckDue(bot, now) && onServer(server, () -> House.hasDarkSpot(bot.level(), h.site()), false)) {
+            if (lightCheckDue(bot, now) && onServer(server, () -> House.hasDarkSpot(bot.level(), h), false)) {
                 SurvivalBrain.maybeSay(server, b, HumanChat.pick("bit dark in here, putting up some torches", "gonna light this place up"), 0.6);
-                House.lightUp(server, bot, b, h.site());
+                House.lightUp(server, bot, b, h);
                 return true;
             }
             b.restUntil = now + 15_000L; // safe inside: wait for morning / to heal
@@ -362,6 +387,8 @@ public final class Home {
             Storage.storeAll(server, bot, b, false);
             return true;
         }
+        // daytime: the house first if it isn't finished
+        if (!n.night() && n.overworld() && StarterHouse.tick(server, bot, b)) return true;
         // daytime: build the farm once, then keep it harvested and replanted
         if (!n.night() && n.overworld() && Farm.tick(server, bot, b)) return true;
         // and any farm it built from a schematic (cane, cactus, bamboo, crops)

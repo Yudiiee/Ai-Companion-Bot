@@ -1,5 +1,20 @@
 # AI Companion - Changelog
 
+## 1.3.0 (Minecraft 26.3)
+
+- Starter houses: every companion builds one of six medieval houses (from a village by ajmed) as its home. The
+  first bot takes the cottage, the next the townhouse, then the inn, workshop, hall and manor. It moves in once
+  60% is up (inside, the middle to come home to, the barrels/chests and the bed come from the design; chests and a
+  bed are added if the design has none) and keeps building in the daytime until it's done. In a treeless spot it
+  puts up the small classic house to live in meanwhile. Bots that already had the classic house build one too.
+- Wood is exact now: spruce is spruce, dark oak is dark oak. The bot chops the right kind of tree for each and
+  says which woods a design needs and what colour they are. When a kind can't be had (warped and crimson only grow
+  in the Nether, no dark oak forest nearby), it picks the closest-looking wood it can get (by colour, the way the
+  eye sees it) and says so; same for other blocks it can't get (prismarine, calcite, stained glass). Bring the real
+  thing and it swaps it in. Flowers, leaves, vines and carpets are decoration: put in when it has them.
+- Trees: "what kind of tree is that", "where do i find dark oak", "what woods are there".
+- More recipes: barrels, smokers, cauldrons, coal blocks, mossy stone, stairs/slabs/walls of every common stone.
+
 ## 1.2.0 (Minecraft 26.3)
 
 - New bundled design: a villager-pod iron farm (by F3deMatt25). "build the iron farm"; bring 3 villagers to the

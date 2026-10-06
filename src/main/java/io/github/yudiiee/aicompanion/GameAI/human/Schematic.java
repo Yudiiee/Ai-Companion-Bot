@@ -405,6 +405,24 @@ public final class Schematic {
             return false;
         }
 
+        private static final String[] DECOR = {"grass", "fern", "flower", "tulip", "poppy", "dandelion", "orchid", "allium",
+                "bluet", "daisy", "cornflower", "lily_of_the_valley", "wither_rose", "lilac", "rose_bush", "peony",
+                "sunflower", "torchflower", "pitcher", "_petals", "wildflowers", "leaf_litter", "_leaves", "vine",
+                "glow_lichen", "moss_carpet", "_carpet", "potted_", "flower_pot", "cake", "candle", "banner", "_wool",
+                "dead_bush", "sweet_berry_bush", "seagrass", "spore_blossom", "hanging_roots", "azalea", "lightning_rod",
+                "mud_brick", "head", "skull", "sea_pickle", "coral", "lily_pad", "mushroom", "frogspawn", "item_frame"};
+
+        /**
+         * Decoration: flowers, grass, leaves, vines, carpets, pots... Put in if it has them, never
+         * gone out for, and a build without them still counts as done.
+         */
+        public static boolean decorative(String path) {
+            if (path.equals("grass_block") || path.endsWith("mushroom_block") || path.equals("mushroom_stem")
+                    || path.equals("moss_block")) return false;
+            for (String d : DECOR) if (path.contains(d)) return true;
+            return false;
+        }
+
         public static boolean isCrop(String path) {
             return path.equals("wheat") || path.equals("carrots") || path.equals("potatoes") || path.equals("beetroots")
                     || path.equals("nether_wart") || path.equals("torchflower_crop") || path.equals("pitcher_crop");
@@ -515,9 +533,8 @@ public final class Schematic {
                 default:
                     break;
             }
-            // any wood will do: oak stairs for spruce stairs (the bot uses what it has)
-            String[] wa = wood(planned), wb = wood(world);
-            if (wa != null && wb != null && wa[1].equals(wb[1])) return true;
+            // (wood has to be the same kind: spruce and dark oak look nothing alike; stand-ins are agreed per build)
+            if (planned.endsWith("_bed") && world.endsWith("_bed")) return true; // any colour of bed sleeps the same
             // things that change by themselves: farmland dries out, powder sets next to water
             if (planned.equals("farmland") && world.equals("dirt")) return true;
             if (planned.endsWith("_concrete_powder") && world.equals(planned.replace("_powder", ""))) return true;

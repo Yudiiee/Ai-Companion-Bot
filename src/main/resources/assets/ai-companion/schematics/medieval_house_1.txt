@@ -1,0 +1,6 @@
+name: medieval cottage
+aliases: medieval house 1, house 1, cottage
+about: Starter house 1 of 6 from a medieval village by ajmed. Spruce and dark oak timber, stone and calcite walls.
+ground: 0
+front: east
+starter: yes

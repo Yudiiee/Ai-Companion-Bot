@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.HashMap;
 import java.util.zip.GZIPOutputStream;
 
 /** Schematic reading, rotation, block rules, name matching and chat routing for the builder. */
@@ -132,8 +133,8 @@ public class BlueprintTest {
         check(Rules.matches(State.parse("chest[type=single,facing=north]"), State.parse("chest[type=left,facing=north]")), "chest pairing ignored");
         check(Rules.matches(State.parse("oak_trapdoor[open=true]"), State.parse("oak_trapdoor[open=false,powered=true]"))
                 && !Rules.matches(State.parse("oak_trapdoor[open=true]"), State.parse("oak_trapdoor[open=false,powered=false]")), "trapdoor open unless redstone flips it");
-        check(Rules.matches(State.parse("oak_planks"), State.parse("spruce_planks")) && Rules.matches(State.parse("oak_log[axis=y]"), State.parse("birch_log[axis=y]"))
-                && !Rules.matches(State.parse("oak_log[axis=y]"), State.parse("birch_log[axis=x]")) && !Rules.matches(State.parse("oak_log"), State.parse("oak_wood")), "any planks/logs, axis still counts");
+        check(!Rules.matches(State.parse("oak_planks"), State.parse("spruce_planks")) && !Rules.matches(State.parse("dark_oak_log[axis=y]"), State.parse("spruce_log[axis=y]"))
+                && Rules.matches(State.parse("red_bed[part=foot,facing=north]"), State.parse("white_bed[part=foot,facing=north,occupied=false]")), "wood is exact (colour matters), beds any colour");
         check(Rules.matches(State.parse("farmland[moisture=7]"), State.parse("dirt")) && Rules.matches(State.parse("red_concrete_powder"), State.parse("red_concrete")), "blocks that change by themselves");
         check(Rules.matches(State.parse("attached_melon_stem[facing=east]"), State.parse("melon_stem[age=7]")), "stems any way");
         check(Rules.kind(State.parse("structure_void")) == Rules.Kind.KEEP, "structure void left as is");
@@ -243,8 +244,8 @@ public class BlueprintTest {
                 && Rules.wood("stone_bricks") == null && Arrays.equals(Rules.wood("spruce_wall_sign"), new String[]{"spruce", "wall_sign"}), "wood names");
         check(Rules.woodPath("warped", "log").equals("warped_stem") && Rules.woodPath("oak", "stripped_log").equals("stripped_oak_log")
                 && Rules.woodPath("birch", "fence_gate").equals("birch_fence_gate"), "wood ids");
-        check(Rules.matches(State.parse("spruce_trapdoor[facing=east,half=top,open=false]"), State.parse("oak_trapdoor[facing=east,half=top,open=false,powered=false]"))
-                && !Rules.matches(State.parse("spruce_trapdoor"), State.parse("spruce_door")), "any wood, same shape");
+        check(!Rules.matches(State.parse("spruce_trapdoor[facing=east,half=top,open=false]"), State.parse("oak_trapdoor[facing=east,half=top,open=false,powered=false]"))
+                && !Rules.matches(State.parse("spruce_trapdoor"), State.parse("spruce_door")), "spruce trapdoor isn't oak");
         Class<?> bbc = Class.forName("io.github.yudiiee.aicompanion.GameAI.human.BlueprintBuilder");
         Method recipeFor = bbc.getDeclaredMethod("recipeFor", String.class);
         recipeFor.setAccessible(true);
@@ -257,8 +258,77 @@ public class BlueprintTest {
         obtainable.setAccessible(true);
         for (String it : new String[]{"stone_brick_slab", "spruce_fence_gate", "lantern", "hopper", "glass_pane", "campfire", "chest", "spruce_sign"})
             check((boolean) obtainable.invoke(null, it, 0), it + " can be made");
-        for (String it : new String[]{"yellow_bed", "moss_carpet", "decorated_pot", "purple_banner"})
+        for (String it : new String[]{"moss_carpet", "decorated_pot", "purple_banner"})
             check(!(boolean) obtainable.invoke(null, it, 0), it + " has to be brought");
+
+        // ---------------- woods ----------------
+        check(Woods.closest("dark_oak").subList(0, 2).contains("spruce") && Woods.closest("spruce").subList(0, 2).contains("dark_oak"),
+                "dark oak and spruce are each other's near colours: " + Woods.closest("dark_oak"));
+        check(Woods.closest("birch").get(0).equals("oak") || Woods.closest("birch").get(0).equals("pale_oak") || Woods.closest("birch").get(0).equals("cherry"),
+                "birch's nearest colour: " + Woods.closest("birch"));
+        System.out.println("  warped -> " + Woods.closest("warped") + ", spruce -> " + Woods.closest("spruce"));
+        check(Woods.speciesOf("stripped_dark_oak_log").equals("dark_oak") && Woods.speciesOf("flowering_azalea_leaves").equals("oak")
+                && Woods.speciesOf("warped_stem").equals("warped") && Woods.speciesOf("cherry_leaves").equals("cherry")
+                && Woods.speciesOf("stone") == null, "which tree a block comes from");
+        check(Woods.isQuestion("what kind of tree is that") && Woods.isQuestion("where do i find dark oak")
+                && Woods.isQuestion("what wood is this") && !Woods.isQuestion("get me some wood"), "tree questions");
+        check(Woods.answerNamed("where do i find dark oak").contains("dark forest") && Woods.answerNamed("what tree is that") == null, "named answers");
+        check(Woods.describe("warped", null).contains("nether") && Woods.describe("birch", null).contains("pale yellow"), "descriptions");
+        check(Rules.decorative("poppy") && Rules.decorative("azalea_leaves") && Rules.decorative("cave_vines_plant") && Rules.decorative("red_carpet")
+                && !Rules.decorative("spruce_planks") && !Rules.decorative("grass_block") && !Rules.decorative("moss_block") && !Rules.decorative("lantern"), "decoration");
+        Method swapped = bbc.getDeclaredMethod("swapped", State.class, Map.class);
+        swapped.setAccessible(true);
+        Map<String, String> sw = new HashMap<>(Map.of("wood:warped", "dark_oak", "calcite", "diorite"));
+        check(swapped.invoke(null, State.parse("warped_stairs[facing=east,half=top]"), sw).toString().equals("minecraft:dark_oak_stairs[facing=east,half=top]")
+                && swapped.invoke(null, State.parse("calcite"), sw).toString().equals("minecraft:diorite")
+                && swapped.invoke(null, State.parse("stripped_warped_stem[axis=x]"), sw).toString().equals("minecraft:stripped_dark_oak_log[axis=x]")
+                && swapped.invoke(null, State.parse("spruce_slab"), sw).toString().equals("minecraft:spruce_slab"), "stand-ins swap in");
+        Map<String, String> chain = new HashMap<>(Map.of("wood:warped", "dark_oak", "wood:dark_oak", "spruce"));
+        check(swapped.invoke(null, State.parse("warped_stairs[facing=east]"), chain).toString().equals("minecraft:spruce_stairs[facing=east]"),
+                "stand-ins chain (warped -> dark oak -> spruce)");
+        Method enc = bbc.getDeclaredMethod("encodeSwaps", Map.class), dec = bbc.getDeclaredMethod("decodeSwaps", String.class);
+        enc.setAccessible(true);
+        dec.setAccessible(true);
+        check(dec.invoke(null, enc.invoke(null, sw)).equals(sw), "stand-ins saved and read back: " + enc.invoke(null, sw));
+        check(!(boolean) obtainable.invoke(null, "warped_stairs", 0) && !(boolean) obtainable.invoke(null, "prismarine_brick_stairs", 0)
+                && !(boolean) obtainable.invoke(null, "gray_stained_glass", 0) && (boolean) obtainable.invoke(null, "dark_oak_stairs", 0)
+                && (boolean) obtainable.invoke(null, "cobblestone_stairs", 0) && (boolean) obtainable.invoke(null, "stone_brick_wall", 0)
+                && (boolean) obtainable.invoke(null, "barrel", 0) && (boolean) obtainable.invoke(null, "smoker", 0), "what it can make in the overworld");
+        Method itemTest = bbc.getDeclaredMethod("itemTest", String.class);
+        itemTest.setAccessible(true);
+        @SuppressWarnings("unchecked") java.util.function.Predicate<String> planksAny = (java.util.function.Predicate<String>) itemTest.invoke(null, "#planks");
+        @SuppressWarnings("unchecked") java.util.function.Predicate<String> spruce = (java.util.function.Predicate<String>) itemTest.invoke(null, "spruce_planks");
+        check(planksAny.test("birch_planks") && spruce.test("spruce_planks") && !spruce.test("oak_planks"), "recipe wildcards vs exact wood");
+
+        // ---------------- the six starter houses ----------------
+        Class<?> sh = Class.forName("io.github.yudiiee.aicompanion.GameAI.human.StarterHouse");
+        Method layoutAt = sh.getDeclaredMethod("layoutAt", Schematic.class, int.class, int.class, int.class, int.class);
+        layoutAt.setAccessible(true);
+        Method keyOf = sh.getDeclaredMethod("key", int.class, int.class, int.class);
+        keyOf.setAccessible(true);
+        Method essential = bbc.getDeclaredMethod("essentialCells", Schematic.class);
+        essential.setAccessible(true);
+        Method entryFor = Blueprints.class.getDeclaredMethod("entryFor", Path.class);
+        entryFor.setAccessible(true);
+        for (int i = 1; i <= 6; i++) {
+            Path f = starters.resolve("medieval_house_" + i + ".nbt");
+            Blueprints.Entry en = (Blueprints.Entry) entryFor.invoke(null, f);
+            Schematic h = Schematic.load(f);
+            Object lay = layoutAt.invoke(null, h, 0, 64, 0, 0);
+            int[] m = (int[]) call(lay, "mid");
+            int fl = ((List<?>) call(lay, "floorCells")).size(), stn = ((List<?>) call(lay, "storageCells")).size(),
+                    sp = ((List<?>) call(lay, "spareCells")).size();
+            boolean midInside = ((Set<?>) call(lay, "local")).contains(keyOf.invoke(null, m[0], m[1], m[2]));
+            Map<String, Integer> woodsOf = Woods.palette(h.blockCounts());
+            System.out.println("  house " + i + " " + en.name() + " " + h.sx + "x" + h.sy + "x" + h.sz + ": " + essential.invoke(null, h)
+                    + " blocks, floor " + fl + ", storage " + stn + ", spare " + sp + ", middle " + Arrays.toString(m) + ", wood " + woodsOf);
+            check(en.starter() && en.name().startsWith("medieval"), "house " + i + " is a starter design");
+            check(fl >= 12 && midInside && sp >= 2, "house " + i + " has an inside, a middle in it and room for chests");
+        }
+        Object l4 = layoutAt.invoke(null, Schematic.load(starters.resolve("medieval_house_4.nbt")), 0, 64, 0, 0);
+        check(((List<?>) call(l4, "storageCells")).size() == 25 && call(l4, "bedCell") != null, "the workshop's barrels are its storage and it has a bed");
+        Object l3 = layoutAt.invoke(null, Schematic.load(starters.resolve("medieval_house_3.nbt")), 0, 64, 0, 0);
+        check(call(l3, "bedCell") != null, "the inn has beds");
 
         // the bundled iron farm
         Schematic iron = Schematic.load(starters.resolve("iron_farm.nbt"));
@@ -281,7 +351,7 @@ public class BlueprintTest {
                 entry("sugar cane farm", "cane farm", "sugarcane farm"),
                 entry("cactus farm", "cacti farm"),
                 entry("bamboo farm"),
-                entry("iron farm"), entry("iron trap"), entry("iron golem trap"), entry("creeper farm", "gunpowder farm"));
+                entry("iron farm"), entry("iron trap"), entry("iron golem trap"), entry("medieval inn", "house 3", "inn"), entry("creeper farm", "gunpowder farm"));
         check(name(Blueprints.find("sugarcane farm", entries)).equals("sugar cane farm"), "sugarcane -> sugar cane farm");
         check(name(Blueprints.find("a cane farm", entries)).equals("sugar cane farm"), "cane farm alias");
         check(name(Blueprints.find("the cacti farm", entries)).equals("cactus farm"), "cacti");
@@ -312,6 +382,7 @@ public class BlueprintTest {
                 {"keep mining", "MINE"}, {"stop", "STOP"}, {"cancel", "STOP"},
                 {"what do you think about building a castle", "null"},
                 {"build a cactus farm next to the house", "BLUEPRINT"}, {"make sugar", "null"}, {"make some cactus", "null"},
+                {"what kind of tree is that", "TREE"}, {"where can i find cherry wood", "TREE"}, {"build the medieval inn", "BLUEPRINT"},
         };
         for (String[] c : cases) {
             Object got = HumanChatListener.classifyLocal(c[0], "Bro");
@@ -332,12 +403,18 @@ public class BlueprintTest {
         System.exit(fails == 0 ? 0 : 1);
     }
 
+    static Object call(Object o, String m) throws Exception {
+        Method mm = o.getClass().getDeclaredMethod(m);
+        mm.setAccessible(true);
+        return mm.invoke(o);
+    }
+
     static String name(Blueprints.Match m) {
         return m == null || m.entry() == null ? "?" : m.entry().name();
     }
 
     static Blueprints.Entry entry(String name, String... aliases) {
-        return new Blueprints.Entry(name, Paths.get(name.replace(" ", "_") + ".nbt"), List.of(aliases), "", 0, "south", "");
+        return new Blueprints.Entry(name, Paths.get(name.replace(" ", "_") + ".nbt"), List.of(aliases), "", 0, "south", "", false);
     }
 
     static int[] invoke(String m, int x, int z, int sx, int sz, int t) throws Exception {

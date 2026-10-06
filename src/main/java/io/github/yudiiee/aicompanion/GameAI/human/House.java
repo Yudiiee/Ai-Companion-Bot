@@ -55,7 +55,7 @@ final class House {
         if (m.matches("^(i'?ll|i will|i'?m|im|i am|i'?d|we'?ll|we will|gonna|i'?m gonna|i was)\\b.*")) return null; // their plans, not a request
         String ack = HumanChat.pick("ok, let's build a house", "sure, gonna build us a proper house",
                 "bet, house coming up. gonna need a lot of wood", "alright, building a base");
-        return new MiningSkills.Request("build a house", ack, (server, bot, b) -> build(server, bot, b, requester));
+        return new MiningSkills.Request("build a house", ack, (server, bot, b) -> StarterHouse.build(server, bot, b, requester));
     }
 
     // ------------------------------------------------------------------------
@@ -375,7 +375,7 @@ final class House {
     // A bed: one it has, one from the chest, or 3 wool (from sheep) + 3 planks
     // ------------------------------------------------------------------------
 
-    private static boolean ensureBed(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b) throws InterruptedException {
+    static boolean ensureBed(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b) throws InterruptedException {
         if (onServer(server, () -> Building.firstItem(bot, House::isBed) != null, false)) return true;
         if (Storage.withdraw(server, bot, b, House::isBed, 1, "bed") > 0) return true;
         int wool = onServer(server, () -> count(bot, House::isWool), 0);
@@ -818,6 +818,30 @@ final class House {
         List<BlockPos> out = new ArrayList<>();
         for (int lx = 1; lx <= s.size() - 2; lx++) for (int lz = 1; lz <= s.size() - 2; lz++) out.add(s.at(lx, 1, lz));
         return out;
+    }
+
+    /** Anywhere inside the home darker than a torch-lit room? Server thread. */
+    static boolean hasDarkSpot(ServerLevel level, Home.Base h) {
+        StarterHouse.Layout l = h.layout();
+        if (l != null) return !l.floor().isEmpty() && Lighting.darkest(level, l.floor()) != null;
+        return hasDarkSpot(level, h.site());
+    }
+
+    /** Lights a home: the classic house's wall torches, or floor torches at the dark spots of a designed one. Job thread. */
+    static void lightUp(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, Home.Base h) throws InterruptedException {
+        StarterHouse.Layout l = h.layout();
+        if (l == null) {
+            lightUp(server, bot, b, h.site());
+            return;
+        }
+        if (onServer(server, () -> Lighting.torches(bot), 0) < 4) Lighting.ensureTorches(server, bot, b, 12, 4, false);
+        for (int pass = 0; pass < 8; pass++) {
+            BlockPos dark = onServer(server, () -> Lighting.darkest(bot.level(), l.floor()), null);
+            if (dark == null || onServer(server, () -> Lighting.torches(bot), 0) == 0) return;
+            if (!BlueprintBuilder.approach(server, bot, dark, 4.3)) return;
+            if (!onServer(server, () -> Lighting.place(bot, dark, Direction.DOWN), false)) return;
+            SurvivalBrain.sleep(900);
+        }
     }
 
     /** Anywhere inside darker than a torch-lit room? Server thread. */

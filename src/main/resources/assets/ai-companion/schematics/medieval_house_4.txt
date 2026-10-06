@@ -1,0 +1,6 @@
+name: medieval workshop
+aliases: medieval house 4, house 4, workshop
+about: Starter house 4 of 6 from a medieval village by ajmed. Spruce and dark oak timber, stone and calcite walls.
+ground: 0
+front: west
+starter: yes

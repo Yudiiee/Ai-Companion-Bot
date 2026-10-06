@@ -1,0 +1,6 @@
+name: medieval inn
+aliases: medieval house 3, house 3, inn
+about: Starter house 3 of 6 from a medieval village by ajmed. Spruce and dark oak timber, stone and calcite walls.
+ground: 0
+front: north
+starter: yes

@@ -1,0 +1,6 @@
+name: medieval hall
+aliases: medieval house 5, house 5, hall
+about: Starter house 5 of 6 from a medieval village by ajmed. Spruce and dark oak timber, stone and calcite walls.
+ground: 0
+front: south
+starter: yes

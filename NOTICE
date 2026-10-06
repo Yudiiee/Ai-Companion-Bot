@@ -11,6 +11,9 @@ storage, mining staircase and strip mining, food farm, building from schematics,
 and survival reflexes)
 and a port to Minecraft 26.3.
 
+The bundled medieval starter houses (src/main/resources/assets/ai-companion/schematics/medieval_house_*.nbt) are
+split from a medieval village design by ajmed.
+
 The bundled iron farm design (src/main/resources/assets/ai-companion/schematics/iron_farm.nbt) is by
 F3deMatt25.
 

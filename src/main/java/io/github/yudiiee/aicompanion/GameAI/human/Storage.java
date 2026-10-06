@@ -388,7 +388,7 @@ public final class Storage {
                 return 0;
             }
             onServer(server, () -> { Home.noteBuildAttempt(bot); return null; }, null);
-            House.build(server, bot, b, null);
+            House.build(server, bot, b, null); // a quick shelter for the loot; the proper house comes later
             home = onServer(server, () -> Home.get(bot), null);
         }
         if (home != null) return storeAtHome(server, bot, b, home, talk);
