@@ -1,0 +1,158 @@
+package io.github.yudiiee.aicompanion.Network;
+
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
+import io.github.yudiiee.aicompanion.AICompanion;
+import io.github.yudiiee.aicompanion.ChatUtils.ChatUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
+public class configNetworkManager {
+
+    public static final Logger LOGGER = LoggerFactory.getLogger("ConfigNetworkMan");
+
+    /**
+     * Returns whether the player may view and update the server's AI configuration.
+     * The server's operator list is authoritative; client-side state is never trusted.
+     */
+    public static boolean canManageServerConfig(ServerPlayer player) {
+        if (player == null) {
+            return false;
+        }
+
+        MinecraftServer server = player.level().getServer();
+        return server != null && server.getPlayerList().isOp(player.nameAndId());
+    }
+
+    private static boolean rejectUnauthorizedConfigChange(ServerPlayer player, String packetType) {
+        if (canManageServerConfig(player)) {
+            return false;
+        }
+
+        LOGGER.warn("Rejected unauthorized {} configuration packet from {} ({})",
+                packetType, player.getName().getString(), player.getUUID());
+        player.sendSystemMessage(Component.literal("You do not have permission to change the server AI configuration."));
+        return true;
+    }
+
+    // Called on the server side: sends a packet to the specified player.
+    public static void sendOpenConfigPacket(ServerPlayer player) {
+        String configData = ConfigJsonUtil.configToJson();
+        OpenConfigPayload payload = new OpenConfigPayload(configData); // initialize the config data onto the payload
+        ServerPlayNetworking.send(player, payload);
+    }
+
+
+    // --- Save Config Packet: Server Receives Updated Config Data from Client ---
+    // Called on the client side to send updated config data.
+    public static void sendSaveConfigPacket(String configData) {
+        SaveConfigPayload payload = new SaveConfigPayload(configData);
+        ClientPlayNetworking.send(payload);
+    }
+
+    // Called on the client side to send updated config data.
+    public static void sendSaveAPIPacket(String provider, String key) {
+        SaveAPIKeyPayload payload = new SaveAPIKeyPayload(provider, key);
+        ClientPlayNetworking.send(payload);
+    }
+
+    // Called on the client side to send custom provider settings (both API key and URL).
+    public static void sendSaveCustomProviderPacket(String apiKey, String apiUrl) {
+        SaveCustomProviderPayload payload = new SaveCustomProviderPayload(apiKey, apiUrl);
+        ClientPlayNetworking.send(payload);
+    }
+
+
+    // On the server side: register a receiver for the model name save config packet.
+    @SuppressWarnings("resource")
+    public static void registerServerModelNameSaveReceiver(MinecraftServer server) {
+        ServerPlayNetworking.registerGlobalReceiver(SaveConfigPayload.ID, (payload, context) -> {
+            String newConfigData = payload.configData();
+            ServerPlayer sender = context.player();
+
+            // Run the config update on the server thread
+            context.server().execute(() -> {
+                if (rejectUnauthorizedConfigChange(sender, "model-selection")) {
+                    return;
+                }
+
+                AICompanion.CONFIG.setSelectedLanguageModel(newConfigData);
+                AICompanion.CONFIG.save();
+                CommandSourceStack serverCommandSource = server.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
+                ChatUtils.sendSystemMessage(serverCommandSource, "Config saved to server successfully!");
+            });
+        });
+    }
+
+    // On the server side: register a single receiver for all API key save packets.
+    public static void registerServerAPIKeySaveReceiver(MinecraftServer server) {
+        ServerPlayNetworking.registerGlobalReceiver(SaveAPIKeyPayload.ID, (payload, context) -> {
+            String provider = payload.provider();
+            String newKey = payload.key();
+            ServerPlayer sender = context.player();
+
+            // Run the config update on the server thread
+            context.server().execute(() -> {
+                if (rejectUnauthorizedConfigChange(sender, "API-key")) {
+                    return;
+                }
+
+                switch (provider) {
+                    case "openai":
+                        AICompanion.CONFIG.setOpenAIKey(newKey);
+                        break;
+                    case "gemini":
+                        AICompanion.CONFIG.setGeminiKey(newKey);
+                        break;
+                    case "claude":
+                        AICompanion.CONFIG.setClaudeKey(newKey);
+                        break;
+                    case "grok":
+                        AICompanion.CONFIG.setGrokKey(newKey);
+                        break;
+                    case "custom":
+                        AICompanion.CONFIG.setCustomApiKey(newKey);
+                        break;
+                    case "ollama":
+                        LOGGER.error("Error! Ollama is not supported in this mode!");
+                        return;
+                    default:
+                        LOGGER.error("Error! Unsupported provider!");
+                        return;
+                }
+                AICompanion.CONFIG.save();
+                CommandSourceStack serverCommandSource = server.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
+                ChatUtils.sendSystemMessage(serverCommandSource, "API Key for " + provider + " saved successfully!");
+            });
+        });
+    }
+
+    // On the server side: register a receiver for custom provider settings.
+    public static void registerServerCustomProviderSaveReceiver(MinecraftServer server) {
+        ServerPlayNetworking.registerGlobalReceiver(SaveCustomProviderPayload.ID, (payload, context) -> {
+            String newApiKey = payload.apiKey();
+            String newApiUrl = payload.apiUrl();
+            ServerPlayer sender = context.player();
+
+            // Run the config update on the server thread
+            context.server().execute(() -> {
+                if (rejectUnauthorizedConfigChange(sender, "custom-provider")) {
+                    return;
+                }
+
+                AICompanion.CONFIG.setCustomApiKey(newApiKey);
+                AICompanion.CONFIG.setCustomApiUrl(newApiUrl);
+                AICompanion.CONFIG.save();
+                CommandSourceStack serverCommandSource = server.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
+                ChatUtils.sendSystemMessage(serverCommandSource, "Custom provider settings saved successfully!");
+            });
+        });
+    }
+
+
+}

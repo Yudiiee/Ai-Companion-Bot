@@ -174,6 +174,29 @@ and makes each companion feel like another person playing with you.
 - Eating: when food is 14 or lower, or when it's hurt and not full (so health comes back).
 - Saved per bot, per world (`<world>/ai-companion/farms.txt`). Seeds aren't thrown out as junk once there's a farm.
 
+**Building from schematics** (farms and anything else)
+- Every `.schem` (WorldEdit, Sponge v1-3), structure-block `.nbt` and `.litematic` in
+  `config/ai-companion/schematics` is something the companions can build. Three starter designs come with the mod:
+  a sugar cane farm, a cactus farm and a bamboo farm (deleting one keeps it gone).
+- `build the iron farm` picks a flat, free spot beside the house with the design's front towards it (or around the
+  bot when there's no house); `build it here` puts it two blocks in front of you, facing you; `build it at x y z`
+  (optionally `facing north`) puts the ground layer's corner there.
+- It works out what's missing and gets it: pockets, then the chests, then crafting (torches, chests, slabs, planks,
+  ladders...), smelting (glass, stone) and digging or cutting (dirt, sand, gravel, cobblestone, logs, sugar cane,
+  cactus, bamboo). Any planks or logs will do. What it can't get it lists, builds the rest, and finishes later.
+- It clears the area top down, then places the solid parts bottom up, then water and lava (filling a bucket at the
+  nearest water, or at its own farm once that refills by itself), then torches, redstone, rails and plants. Plain
+  blocks go in with a right-click; anything that points a certain way (pistons, observers, hoppers, stairs,
+  repeaters...) uses the item up and is set exactly as the design says. Doors, beds and tall flowers get both halves.
+- It won't tear down someone's build or empty a container: if a new build would, it says so and leaves it.
+- Harvests what it built: cane, cactus and bamboo above the bottom block, ripe crops, melons and pumpkins, then
+  replants. It does it by itself in the daytime when enough has grown, or when asked (`harvest the cane farm`).
+- Chat: `what can you build`, `build a cactus farm`, `what do you need for the iron farm`, `continue the build`,
+  `harvest the bamboo`, `forget the iron farm`.
+- A `<name>.txt` next to a file can set `name:`, `aliases:`, `about:`, `ground:` (which layer sits at ground level)
+  and `front:` (north/east/south/west, default south).
+- Builds are saved per world (`<world>/ai-companion/builds.txt`); finished ones aren't mined or tunnelled through.
+
 **Chests / storage**
 - The chest in the house becomes the storage chest. `use this chest` (while looking at a chest or barrel) makes that
   one storage. Storage chests are remembered per world, in `<world save>/ai-companion/chests.txt`.
@@ -276,4 +299,4 @@ It hooks into: `AICompanion` (registration, hit reaction), `AICompanionClient` (
 `ItemHandoffHandler` (casual lines), `LLMServiceHandler` / `RAG2` / `PromptBuilder` (persona prompt),
 `NearbyBedSleepController` (reads the bed rule through the environment attribute system).
 
-Build: `./gradlew build` → `build/libs/ai-companion-1.0.0+26.3.jar`.
+Build: `./gradlew build` → `build/libs/ai-companion-1.1.0+26.3.jar`.

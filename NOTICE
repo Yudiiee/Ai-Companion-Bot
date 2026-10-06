@@ -7,7 +7,8 @@ Public License, version 2. AI Companion is distributed under the same license; s
 
 Modified by Udit in 2026: renamed and repackaged as AI Companion, with a new
 human-like behaviour layer (chat, body language, pathfinding, house building and
-storage, mining staircase and strip mining, food farm, combat and survival reflexes)
+storage, mining staircase and strip mining, food farm, building from schematics, combat
+and survival reflexes)
 and a port to Minecraft 26.3.
 
 The language models used by the chat intent system are downloaded at first launch

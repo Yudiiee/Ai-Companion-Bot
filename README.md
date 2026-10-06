@@ -28,6 +28,10 @@ on their own out of the box, and you can hook them up to an LLM for real convers
   off if there's water or lava in them. Each trip carries on where the last one stopped.
 - **Food farm.** A 9×9 plot beside the house with water, torches and crops (carrots/potatoes, then
   wheat, then beetroot). It harvests, replants, bakes bread and keeps enough food on hand.
+- **Builds from schematics.** Drop WorldEdit `.schem`, structure-block `.nbt` or Litematica `.litematic` files in
+  `config/ai-companion/schematics` and say `build the iron farm`. It gathers what it can, builds it in the right
+  order with pistons, observers and redstone pointing the right way, and tells you what's still missing. Comes with
+  a sugar cane farm, a cactus farm and a bamboo farm, and keeps the farms it builds harvested.
 - **Fights smart.** It goes after creepers (hit and back off) and skeletons (shield up, close in)
   on sight, and fights any other mob once it's attacked. Below 7 health it blocks the mob off
   and retreats to heal.
@@ -57,6 +61,7 @@ The full list of what the companions do is in [FEATURES.md](FEATURES.md).
    - `build a house`, `go home`, `what's in the chest`, `store your stuff`
    - `get me 10 iron`, `mine diamonds`, `dig down`, `strip mine for gold`
    - `build a farm`, `harvest the crops`
+   - `what can you build`, `build a cactus farm`, `build the iron farm here`, `continue the build`
    - `follow me`, `stay here`, `come here`, `stop`
 
 It plays on its own when you leave it be. `/humanlike` shows the settings (chat, autoplay, home,

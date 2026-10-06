@@ -1,0 +1,5 @@
+name: bamboo farm
+aliases: bamboo plantation
+about: 7x7 of grass with 16 bamboo shoots and torches so it grows at night.
+ground: 0
+front: south

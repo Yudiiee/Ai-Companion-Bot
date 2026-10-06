@@ -1,0 +1,434 @@
+package io.github.yudiiee.aicompanion.OllamaClient;
+
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import io.github.amithkoujalgi.ollama4j.core.OllamaAPI;
+import io.github.amithkoujalgi.ollama4j.core.models.chat.*;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
+import io.github.yudiiee.aicompanion.AICompanion;
+import io.github.yudiiee.aicompanion.ChatUtils.ChatUtils;
+import io.github.yudiiee.aicompanion.ChatUtils.Helper.RAG2;
+import io.github.yudiiee.aicompanion.ChatUtils.NLPProcessor;
+import io.github.yudiiee.aicompanion.Database.SQLiteDB;
+import io.github.yudiiee.aicompanion.FilingSystem.LLMClientFactory;
+import io.github.yudiiee.aicompanion.FunctionCaller.FunctionCallerV2;
+import io.github.yudiiee.aicompanion.GameAI.autonomous.AutonomousManager;
+import io.github.yudiiee.aicompanion.Overlay.ThinkingStateManager;
+import io.github.yudiiee.aicompanion.ServiceLLMClients.LLMClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
+import java.net.http.HttpTimeoutException;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class ollamaClient {
+
+    public static final Logger LOGGER = LoggerFactory.getLogger("ai-companion");
+    private static final String host = "http://localhost:11434";
+    public static String botName = "";
+    public static boolean isInitialized = false;
+    public static String initialResponse = "";
+    public static final OllamaAPI ollamaAPI = new OllamaAPI(host);
+    private static final Pattern THINK_BLOCK = Pattern.compile("<think>([\\s\\S]*?)</think>");
+    private static final ExecutorService BOT_TASK_POOL = Executors.newCachedThreadPool(io.github.yudiiee.aicompanion.GameAI.human.DaemonThreads.named("ai-companion-ollama"));
+
+    // ── LLMContextBridge API ──────────────────────────────────────────────────
+
+    /**
+     * Cheap availability guard used by {@link io.github.yudiiee.aicompanion.Personality.LLMContextBridge}.
+     *
+     * <p>Returns {@code true} when the client has been successfully initialised
+     * ({@link #isInitialized} is set to {@code true} at the end of
+     * {@link #initializeOllamaClient()}).  This avoids an extra network round-trip
+     * on every LLM call; the startup ping in {@link #pingOllamaServer()} already
+     * confirms reachability.
+     *
+     * <p>Falls back to a live {@code ollamaAPI.ping()} only when the client has
+     * not yet been initialised (e.g. autonomous engine fires before the bot has
+     * fully spawned), so callers never block indefinitely.
+     *
+     * @return {@code true} if Ollama is ready to accept requests.
+     */
+    public static boolean isAvailable() {
+        if (isInitialized) return true;
+        // Not yet initialised — do a quick live check rather than returning false
+        // immediately, so early autonomous goals can still reach Ollama.
+        try {
+            return ollamaAPI.ping();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Sends a single-turn prompt to Ollama and returns the text reply.
+     *
+     * <p>Uses the same model and {@link OllamaAPIHelper#smartChat} path as the
+     * rest of the codebase so reasoning-model {@code <think>} blocks are stripped
+     * automatically before the reply is returned.
+     *
+     * <p>This method is <strong>blocking</strong>; always call it from a
+     * background thread (e.g. inside {@code CompletableFuture.supplyAsync}).
+     *
+     * @param prompt The full prompt text to send to the LLM.
+     * @return The content portion of the LLM reply (think-blocks stripped).
+     * @throws Exception if the Ollama API call fails.
+     */
+    public static String sendMessage(String prompt) throws Exception {
+        String selectedLM = AICompanion.CONFIG.getSelectedLanguageModel();
+
+        List<OllamaChatMessage> messages = new ArrayList<>();
+        messages.add(new OllamaChatMessage(OllamaChatMessageRole.SYSTEM, generateSystemPrompt()));
+        messages.add(new OllamaChatMessage(OllamaChatMessageRole.USER, prompt));
+
+        OllamaThinkingResponse response = OllamaAPIHelper.smartChat(
+                ollamaAPI,
+                host,
+                selectedLM,
+                messages
+        );
+
+        // Return only the non-thinking portion so callers get clean text.
+        return response.getContent();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public static void runFromChat(String botName, String message, UUID playerUUID) {
+        MinecraftServer server = AICompanion.serverInstance;
+        ServerPlayer bot = server.getPlayerList().getPlayerByName(botName);
+        if (bot == null) {
+            LOGGER.error("Bot {} not online.", botName);
+            return;
+        }
+        CommandSourceStack botSource = bot.createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
+
+        // A human is now talking to the bot — pause autonomous loop
+        AutonomousManager.getInstance().setPlayerControlled(botName, true);
+
+        server.execute(() -> {
+            try {
+                routeIntent(message, botSource, playerUUID);
+            } catch (Exception e) {
+                LOGGER.error("Chat processing error: ", e);
+                ChatUtils.sendChatMessages(botSource, "\u26a0\ufe0f I'm confused! Please report this.");
+            } finally {
+                // Resume autonomous loop after the interaction is handled
+                AutonomousManager.getInstance().setPlayerControlled(botName, false);
+            }
+        });
+    }
+
+    public static void execute(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        botName = EntityArgument.getPlayer(context, "bot").getName().tryCollapseToString();
+        String message = StringArgumentType.getString(context, "message");
+
+        MinecraftServer server = context.getSource().getServer();
+        CommandSourceStack playerSource = context.getSource();
+        CommandSourceStack botSource = Objects.requireNonNull(server.getPlayerList().getPlayerByName(botName))
+                .createCommandSourceStack().withSuppressedOutput().withMaximumPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
+
+        String formatter = ChatUtils.getRandomColorCode();
+
+        server.execute(() -> {
+            server.getCommands().performPrefixedCommand(playerSource, "/say " + formatter + message);
+            server.getCommands().performPrefixedCommand(botSource, "/say Processing your message, please wait.");
+        });
+
+        // Pause autonomous loop while the command message is handled
+        AutonomousManager.getInstance().setPlayerControlled(botName, true);
+
+        server.execute(() -> {
+            try {
+                routeIntent(message, botSource, Objects.requireNonNull(playerSource.getPlayer()).getUUID());
+            } catch (Exception e) {
+                LOGGER.error("NLP error: ", e);
+                ChatUtils.sendChatMessages(botSource, "\u26a0\ufe0f NLP issue. Report to developer.");
+            } finally {
+                AutonomousManager.getInstance().setPlayerControlled(botName, false);
+            }
+        });
+    }
+
+    private static void routeIntent(String message, CommandSourceStack botSource, UUID playerUUID) throws Exception {
+        NLPProcessor.Intent intent = NLPProcessor.getIntention(message);
+        LLMClient configuredClient = createConfiguredServiceClient();
+
+        LOGGER.info("\uD83D\uDCE8 Received intent: {}", intent);
+
+        switch (intent) {
+            case GENERAL_CONVERSATION, ASK_INFORMATION -> {
+                BOT_TASK_POOL.submit(() -> {
+                    Thread.currentThread().setName("RAG2-Worker");
+                    LOGGER.info("\uD83E\uDDF5 Started RAG2 worker thread");
+                    if (configuredClient != null) {
+                        RAG2.run(message, botSource, intent, configuredClient);
+                    } else {
+                        RAG2.run(message, botSource, intent);
+                    }
+                    LOGGER.info("\u2705 Finished RAG2 worker thread");
+                });
+            }
+
+            case REQUEST_ACTION -> {
+                BOT_TASK_POOL.submit(() -> {
+                    Thread.currentThread().setName("Function-Caller-Worker");
+                    LOGGER.info("\uD83E\uDDF5 Started FunctionCallerV2 worker thread");
+                    new FunctionCallerV2(botSource, playerUUID);
+                    if (configuredClient != null) {
+                        FunctionCallerV2.run(message, configuredClient);
+                    } else {
+                        FunctionCallerV2.run(message);
+                    }
+                    LOGGER.info("\u2705 Finished FunctionCallerV2 worker thread");
+                });
+            }
+
+            default -> {
+                LOGGER.warn("\u26a0\ufe0f Intent unclear, retrying with LLM classification...");
+                ChatUtils.sendChatMessages(botSource, "\uD83D\uDD0D Reanalyzing...");
+
+                NLPProcessor.Intent retry = configuredClient != null
+                        ? NLPProcessor.getIntentionFromLLM(message, configuredClient)
+                        : retryIntentLLM(message);
+
+                LOGGER.info("\uD83D\uDCE8 Retry intent: {}", retry);
+
+                if (retry == NLPProcessor.Intent.GENERAL_CONVERSATION || retry == NLPProcessor.Intent.ASK_INFORMATION) {
+                    BOT_TASK_POOL.submit(() -> {
+                        Thread.currentThread().setName("RAG2-Retry-Worker");
+                        LOGGER.info("\uD83E\uDDF5 Started RAG2 retry worker thread");
+                        if (configuredClient != null) {
+                            RAG2.run(message, botSource, retry, configuredClient);
+                        } else {
+                            RAG2.run(message, botSource, retry);
+                        }
+                        LOGGER.info("\u2705 Finished RAG2 retry worker thread");
+                    });
+                } else if (retry == NLPProcessor.Intent.REQUEST_ACTION) {
+                    BOT_TASK_POOL.submit(() -> {
+                        Thread.currentThread().setName("Function-Caller-Retry-Worker");
+                        LOGGER.info("\uD83E\uDDF5 Started FunctionCallerV2 retry worker thread");
+                        new FunctionCallerV2(botSource, playerUUID);
+                        if (configuredClient != null) {
+                            FunctionCallerV2.run(message, configuredClient);
+                        } else {
+                            FunctionCallerV2.run(message);
+                        }
+                        LOGGER.info("\u2705 Finished FunctionCallerV2 worker thread");
+                    });
+                } else {
+                    LOGGER.warn("\u26a0\ufe0f Intent remained unclear after retry.");
+                    ChatUtils.sendChatMessages(botSource, "I couldn't understand that clearly. Please try rephrasing.");
+                }
+            }
+        }
+    }
+
+    private static LLMClient createConfiguredServiceClient() {
+        String llmProvider = System.getProperty("aicompanion.llmMode", "custom");
+        if ("ollama".equalsIgnoreCase(llmProvider)) {
+            return null;
+        }
+        LLMClient client = LLMClientFactory.createClient(llmProvider);
+        if (client == null) {
+            LOGGER.warn("No service LLM client available for provider '{}'; falling back to Ollama path.", llmProvider);
+        }
+        return client;
+    }
+
+    private static NLPProcessor.Intent retryIntentLLM(String message) {
+        return NLPProcessor.getIntentionFromLLM(message);
+    }
+
+    /**
+     * Pings Ollama server to check if it's reachable.
+     * Returns false instead of crashing if server is not available.
+     *
+     * @return true if server is reachable, false otherwise
+     */
+    public static boolean pingOllamaServer() {
+        try {
+            boolean reachable = ollamaAPI.ping();
+            if (reachable) {
+                LOGGER.info("\u2713 Ollama server is alive and responding");
+            } else {
+                LOGGER.warn("\u26a0 Ollama server ping returned false");
+            }
+            return reachable;
+        } catch (Exception e) {
+            LOGGER.warn("\u26a0 Ollama server is not reachable: {}. AI chat features will be unavailable.", e.getMessage());
+            LOGGER.info("Please ensure Ollama is installed and running on localhost:11434");
+            return false;
+        }
+    }
+
+    public static void initializeOllamaClient() {
+        if (isInitialized) return;
+
+        MinecraftServer server = AICompanion.serverInstance;
+        if (server == null) {
+            LOGGER.error("Server instance is null.");
+            return;
+        }
+
+        ollamaAPI.setRequestTimeoutSeconds(90);
+        String selectedLM = AICompanion.CONFIG.getSelectedLanguageModel();
+        LOGGER.info("Connecting to Ollama using model: {}", selectedLM);
+
+        CompletableFuture.runAsync(() -> {
+            int retries = 0;
+            boolean success = false;
+
+            while (!success && retries < 3) {
+                try {
+                    // Build messages for the new API format
+                    List<OllamaChatMessage> messages = new ArrayList<>();
+                    messages.add(new OllamaChatMessage(OllamaChatMessageRole.SYSTEM, generateSystemPrompt()));
+                    messages.add(new OllamaChatMessage(OllamaChatMessageRole.USER, "Initializing chat."));
+
+                    // Use smart chat that automatically detects reasoning models
+                    OllamaThinkingResponse response = OllamaAPIHelper.smartChat(
+                            ollamaAPI,
+                            host,
+                            selectedLM,
+                            messages
+                    );
+
+                    initialResponse = response.getFullResponse();
+                    LOGGER.info("Ollama Client initialized. Initial response: {}", response.getContent());
+
+                    if (response.hasThinking()) {
+                        LOGGER.info("\uD83D\uDCAD Model provided thinking: {} chars", response.getThinking().length());
+                    }
+
+                    server.execute(() ->
+                            server.sendSystemMessage(Component.nullToEmpty("\u00a79" + botName + " is ready!"))
+                    );
+
+                    isInitialized = true;
+                    success = true;
+
+                    // ── Start the autonomous goal engine for this bot ──────────────────
+                    ServerPlayer botPlayer = server.getPlayerList().getPlayerByName(botName);
+                    UUID botUUID = botPlayer != null ? botPlayer.getUUID() : UUID.randomUUID();
+                    LOGGER.info("[autonomous] Handing off to AutonomousManager for bot '{}'", botName);
+                    AutonomousManager.getInstance().startBot(botName, botUUID);
+                    // ──────────────────────────────────────────────────────────────────
+
+                } catch (HttpTimeoutException e) {
+                    retries++;
+                    LOGGER.error("Timeout initializing Ollama (attempt {}/3)", retries);
+                } catch (Exception e) {
+                    LOGGER.error("Failed initializing Ollama: {}", e.getMessage(), e);
+                    throw new RuntimeException(e);
+                }
+            }
+
+            if (!success) {
+                LOGGER.error("Failed to initialize Ollama after 3 attempts.");
+                server.sendSystemMessage(Component.nullToEmpty("\u00a7c\u00a7lCould not establish uplink."));
+            }
+        });
+    }
+
+    private static String generateSystemPrompt() {
+
+        return
+                "You are a Minecraft player named " + botName + " who is connected to Minecraft using a mod. You exist within the Minecraft world and can interact with the player and the environment just like any other player in the game. Your job is to engage in conversations with the player, respond to their questions, offer help, and provide information about the game. Address the player directly and appropriately, responding to their name or as 'Player' if their name is not known. Do not refer to the player as " + botName + ", only address yourself as " + botName + " Keep your responses relevant to Minecraft and make sure to stay in character as a helpful and knowledgeable assistant within the game."
+                        +
+                        """
+
+                        When the player asks you to perform an action, such as providing information, offering help, or interacting with the game world, such as:
+
+                        Providing game tips or crafting recipes.
+                        Giving information about specific Minecraft entities, items, or biomes.
+                        Assisting with in-game tasks, like building structures or exploring areas.
+                        Interacting with the environment, such as planting crops or fighting mobs.
+
+                        Always ensure your responses are timely and contextually appropriate, enhancing the player's gaming experience. Remember to keep track of the sequence of events and maintain continuity in your responses. If an event is primarily informational or involves internal actions, it may be sufficient just to remember it without a verbal response.
+
+                        If a player uses inappropriate language or discusses inappropriate topics, handle the situation by gently redirecting the conversation or by providing a neutral response that discourages further inappropriate behavior.
+
+                        For example:
+
+                        If a player uses vulgar language, you can respond with: "Let's keep our chat friendly and fun! Is there something else about Minecraft you'd like to discuss?"
+                        If a player insists on inappropriate topics, you can say: "I'm here to help with Minecraft-related questions. How about we talk about your latest adventure in the game?"
+                        If a player says these words "kill yourself" or "kys", you should respond calmly and normally and tell the player to see the beauty of life.
+
+
+                        Your pronouns, are by default, to be addressed as the pronouns based on your name's gender (female/male). However if the player decides to address you with different pronouns, you must not object. For now, either introduce yourself or crack a random joke; the joke should be completely family-friendly, or just greet the player.
+
+                        The name Steve has the pronouns: he/him
+                        The name Alex has the pronouns: she/her
+
+                        If the player asks you as to why you were put here in the first place: Remember that it was the developer's idea to solve the ever existing problem of loneliness in minecraft as much as possible by making this mod.
+
+                        For now introduce yourself with your name.
+                        """;
+
+    }
+
+    public static void sendInitialResponse(CommandSourceStack botSource) {
+        MinecraftServer server = botSource.getServer();
+
+        // \u2705 Schedule the WHOLE logic back to the main thread
+        server.execute(() -> {
+            processLLMOutput(initialResponse, botName, botSource);
+
+            List<SQLiteDB.Memory> memories = SQLiteDB.fetchInitialResponse();
+            if (memories.isEmpty()) {
+                CompletableFuture.runAsync(() -> {
+                    try {
+                        io.github.yudiiee.aicompanion.ServiceLLMClients.EmbeddingClient embeddingClient =
+                                io.github.yudiiee.aicompanion.FilingSystem.EmbeddingClientFactory.createClient();
+                        List<Double> embedding = embeddingClient.generateEmbedding(generateSystemPrompt());
+                        SQLiteDB.storeMemory("conversation", generateSystemPrompt(), initialResponse, embedding);
+                        LOGGER.info("\u2705 Saved initial response using {} embeddings.", embeddingClient.getProvider());
+                    } catch (Exception e) {
+                        LOGGER.error("\u274c Failed saving initial response: {}", e.getMessage(), e);
+                    }
+                });
+            } else {
+                LOGGER.info("\uD83D\uDDC3\uFE0F Initial response already in DB.");
+            }
+        });
+    }
+
+    public static void processLLMOutput(String fullResponse, String botName, CommandSourceStack botSource) {
+        Matcher matcher = THINK_BLOCK.matcher(fullResponse);
+
+        if (matcher.find()) {
+            String thinking = matcher.group(1).trim();
+            String remainder = fullResponse.replace(matcher.group(0), "").trim();
+
+            ThinkingStateManager.start(botName);
+            ChatUtils.sendChatMessages(botSource, botName + " is thinking...");
+
+            for (String line : thinking.split("\\n")) {
+                ThinkingStateManager.appendThoughtLine(line);
+            }
+
+            ThinkingStateManager.end();
+            ChatUtils.sendChatMessages(botSource, botName + " is done thinking!");
+
+            if (!remainder.isEmpty()) {
+                ChatUtils.sendChatMessages(botSource, botName + ": " + remainder);
+            }
+        } else {
+            ChatUtils.sendChatMessages(botSource, botName + ": " + fullResponse);
+        }
+    }
+
+}

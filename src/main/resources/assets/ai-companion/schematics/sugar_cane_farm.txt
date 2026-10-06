@@ -1,0 +1,5 @@
+name: sugar cane farm
+aliases: cane farm, sugarcane farm
+about: 9x9: three water channels lined with sand and sugar cane. Cut it and it grows back.
+ground: 0
+front: south

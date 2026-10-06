@@ -1,0 +1,368 @@
+package io.github.yudiiee.aicompanion.GameAI.autonomous;
+
+import net.minecraft.server.level.ServerPlayer;
+import io.github.yudiiee.aicompanion.AICompanion;
+import io.github.yudiiee.aicompanion.GameAI.companion.BotStance;
+import io.github.yudiiee.aicompanion.GameAI.companion.CompanionController;
+import io.github.yudiiee.aicompanion.GameAI.proximity.GreetingCooldownTracker;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Watches the raw server chat stream for socially significant events and
+ * injects conversational goal strings into the {@link AutonomousGoalEngine}.
+ *
+ * <p>This class is purely a <em>social</em> reactor -- it never injects
+ * survival or motor goals.  Those remain the responsibility of the RL system.
+ *
+ * <p>Additionally, it parses <em>stance trigger phrases</em> from player
+ * chat directed at the bot (e.g. {@code "follow me"}, {@code "stay here"})
+ * and delegates stance changes to {@link CompanionController}.
+ *
+ * <h3>Usage</h3>
+ * Call {@link #process(String)} from {@code BotEventHandler} every time a
+ * raw chat/system message arrives from the server.  If the message matches a
+ * known pattern the listener injects an appropriate conversational goal via
+ * {@link AutonomousGoalEngine#injectUrgentGoal(String)}.
+ *
+ * <h3>Pattern table (social)</h3>
+ * <pre>
+ * Server message pattern                      -&gt; Injected goal
+ * -------------------------------------------------------------------------
+ * &lt;player&gt; has made the advancement [X]      -&gt; congratulate &lt;player&gt; on getting [X] in chat
+ * &lt;player&gt; was slain by / died               -&gt; express sympathy to &lt;player&gt; in chat
+ * &lt;player&gt; joined the game                   -&gt; greet &lt;player&gt; in chat
+ * &lt;player&gt; left the game                    -&gt; say goodbye to &lt;player&gt; in chat
+ * &lt;player&gt; found [diamond/netherite/...item] -&gt; react to &lt;player&gt; finding [item] in chat
+ * &lt;player&gt; entered the Nether               -&gt; wish &lt;player&gt; luck in the Nether in chat
+ * &lt;player&gt; has reached the goal [X]         -&gt; cheer on &lt;player&gt; in chat
+ * </pre>
+ *
+ * <h3>Stance trigger phrases (chat-driven)</h3>
+ * <pre>
+ * "follow me" / "follow &lt;player&gt;"  -&gt; FOLLOW stance
+ * "stay here" / "stop moving"      -&gt; STAY stance
+ * "wander" / "go explore" / ...    -&gt; WANDER stance
+ * </pre>
+ */
+public class WorldEventListener {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger("world-event-listener");
+    private static final Pattern PLAYER_JOINED_PATTERN = Pattern.compile("^(\\S+) joined the game");
+
+    // -------------------------------------------------------------------------
+    // Event pattern descriptors
+    // -------------------------------------------------------------------------
+
+    private record EventPattern(Pattern pattern, GoalBuilder builder) {
+        @FunctionalInterface
+        interface GoalBuilder {
+            String build(Matcher m);
+        }
+    }
+
+    private static final List<EventPattern> PATTERNS = List.of(
+
+        // Advancement
+        new EventPattern(
+            Pattern.compile("^(\\S+) has made the advancement \\[(.+?)\\]"),
+            m -> "congratulate " + m.group(1) + " on getting the advancement '" + m.group(2) + "' in chat"
+        ),
+
+        // Goal (end-screen advancement)
+        new EventPattern(
+            Pattern.compile("^(\\S+) has reached the goal \\[(.+?)\\]"),
+            m -> "cheer on " + m.group(1) + " for reaching the goal '" + m.group(2) + "' in chat"
+        ),
+
+        // Challenge advancement
+        new EventPattern(
+            Pattern.compile("^(\\S+) has completed the challenge \\[(.+?)\\]"),
+            m -> "congratulate " + m.group(1) + " on completing the challenge '" + m.group(2) + "' in chat"
+        ),
+
+        // Death -- "was slain by"
+        new EventPattern(
+            Pattern.compile("^(\\S+) was slain by (.+)"),
+            m -> "express sympathy to " + m.group(1) + " for being slain by " + m.group(2) + " in chat"
+        ),
+
+        // Death -- generic variants (drowned, fell, blew up, burned, etc.)
+        new EventPattern(
+            Pattern.compile("^(\\S+) (drowned|fell|blew up|burned|froze|starved|suffocated|was shot|was pummeled|was killed|went up in flames|tried to swim in lava|died)"),
+            m -> "express sympathy to " + m.group(1) + " who " + m.group(2) + " in chat"
+        ),
+
+        // Player left
+        new EventPattern(
+            Pattern.compile("^(\\S+) left the game"),
+            m -> "say goodbye to " + m.group(1) + " in chat"
+        ),
+
+        // Entered the Nether
+        new EventPattern(
+            Pattern.compile("^(\\S+) entered the Nether"),
+            m -> "wish " + m.group(1) + " luck in the Nether in chat"
+        ),
+
+        // Found notable item (diamond, netherite, etc.) -- typical server plugin announcement
+        new EventPattern(
+            Pattern.compile("^(\\S+) (?:found|mined|discovered) (?:a |an |some )?(diamond|netherite|ancient debris|emerald)",
+                            Pattern.CASE_INSENSITIVE),
+            m -> "react excitedly to " + m.group(1) + " finding " + m.group(2) + " in chat"
+        )
+    );
+
+    // -------------------------------------------------------------------------
+    // Stance trigger patterns  (Feature 1.6)
+    // -------------------------------------------------------------------------
+
+    /**
+     * A stance trigger record pairs a compiled pattern with the {@link BotStance}
+     * it maps to.  The first capture group (if present) is the target player name
+     * for {@code FOLLOW} -- used to record who to follow in
+     * {@link CompanionController}.
+     */
+    private record StanceTrigger(Pattern pattern, BotStance stance) {}
+
+    /**
+     * Ordered list of stance trigger patterns.
+     *
+     * <p>Chat lines are stripped of the leading {@code <sender>} before matching,
+     * so these patterns match only the <em>message body</em> (lower-cased).
+     *
+     * <p>Each pattern is tried in order; the first match wins.
+     */
+    private static final List<StanceTrigger> STANCE_TRIGGERS = List.of(
+
+        // "follow me"  -- follow the message sender (resolved by applyStanceTrigger)
+        new StanceTrigger(
+            Pattern.compile("\\bfollow\\s+me\\b", Pattern.CASE_INSENSITIVE),
+            BotStance.FOLLOW
+        ),
+
+        // "follow <player>"  -- follow a named player
+        new StanceTrigger(
+            Pattern.compile("\\bfollow\\s+(\\S+)", Pattern.CASE_INSENSITIVE),
+            BotStance.FOLLOW
+        ),
+
+        // "stay here" / "stop moving" / "stay put" / "don't move"
+        new StanceTrigger(
+            Pattern.compile("\\b(stay\\s+here|stop\\s+moving|stay\\s+put|don'?t\\s+move)\\b",
+                            Pattern.CASE_INSENSITIVE),
+            BotStance.STAY
+        ),
+
+        // "wander" / "go explore" / "do your thing" / "roam around" / "be free"
+        new StanceTrigger(
+            Pattern.compile("\\b(wander|go\\s+explore|do\\s+your\\s+thing|roam\\s+around|be\\s+free)\\b",
+                            Pattern.CASE_INSENSITIVE),
+            BotStance.WANDER
+        )
+    );
+
+    // -------------------------------------------------------------------------
+    // Instance
+    // -------------------------------------------------------------------------
+
+    private final AutonomousGoalEngine engine;
+
+    /** Name of the bot itself -- used to avoid the bot reacting to its own messages. */
+    private final String botName;
+
+    public WorldEventListener(AutonomousGoalEngine engine, String botName) {
+        this.engine  = engine;
+        this.botName = botName;
+    }
+
+    // -------------------------------------------------------------------------
+    // Public API
+    // -------------------------------------------------------------------------
+
+    /**
+     * Feed a raw server message into the listener.
+     * Call this from {@code BotEventHandler} on every incoming chat/system message.
+     *
+     * @param rawMessage The full raw text of the server message.
+     */
+    public void process(String rawMessage) {
+        if (rawMessage == null || rawMessage.isBlank()) return;
+
+        // Strip colour codes and [Server] prefix
+        String stripped = rawMessage
+                .replaceAll("\u00a7.", "")           // strip Minecraft colour codes
+                .replaceAll("^\\[Server]\\s*", "")    // strip [Server] prefix
+                .trim();
+
+        // Don't let the bot react to its own messages
+        if (stripped.startsWith(botName + " ") || stripped.startsWith("[" + botName + "]")
+                || stripped.startsWith("<" + botName + ">") || stripped.startsWith("[AI Companion]")) {
+            return;
+        }
+
+        // -- 1. Stance trigger check (chat-driven, Feature 1.6) ----------------
+        // Vanilla chat format: "<PlayerName> message body"
+        Matcher chatMatcher = Pattern.compile("^<(\\S+)>\\s+(.+)$").matcher(stripped);
+        if (chatMatcher.find()) {
+            String sender      = chatMatcher.group(1);
+            String messageBody = chatMatcher.group(2);
+
+            // Lines spoken by bots (including this mod's human-like chat) are not commands.
+            ServerPlayer senderPlayer = resolvePlayer(sender);
+            if (senderPlayer == null || io.github.yudiiee.aicompanion.GameAI.human.HumanBehavior.isBot(senderPlayer)) {
+                return;
+            }
+
+            if (applyStanceTrigger(sender, messageBody)) {
+                return; // stance handled -- skip social goal injection
+            }
+        }
+
+        // -- 2. Join greeting (shared cooldown with proximity greetings) -------
+        Matcher joinedMatcher = PLAYER_JOINED_PATTERN.matcher(stripped);
+        if (joinedMatcher.find()) {
+            String playerName = joinedMatcher.group(1);
+            if (GreetingCooldownTracker.tryAcquire(botName, playerName)) {
+                // A quick "hey X" like a person would type, instead of a slow LLM round-trip.
+                if (AICompanion.serverInstance != null && !playerName.equals(botName)) {
+                    io.github.yudiiee.aicompanion.GameAI.human.HumanReactions.playerJoined(AICompanion.serverInstance, botName, playerName);
+                }
+            } else {
+                LOGGER.debug("[world-event] Suppressed repeat greeting for '{}'", playerName);
+            }
+            return;
+        }
+
+        // -- 3. Social event goal injection ------------------------------------
+        if (reactLikeAPlayer(stripped)) return;
+        for (EventPattern ep : PATTERNS) {
+            Matcher m = ep.pattern().matcher(stripped);
+            if (m.find()) {
+                String goal = ep.builder().build(m);
+                LOGGER.info("[world-event] '{}' -> injecting goal: '{}'", stripped, goal);
+                engine.injectUrgentGoal(goal);
+                return; // one event -> one goal; don't stack multiple reactions
+            }
+        }
+    }
+
+    /**
+     * Handles common server events with a quick human reaction ("rip", "gg", "cya").
+     * Returns true if the event was recognised (so no LLM goal is queued for it).
+     */
+    private boolean reactLikeAPlayer(String msg) {
+        var server = AICompanion.serverInstance;
+        if (server == null) return false;
+        Matcher m;
+        if ((m = Pattern.compile("^(\\S+) has (?:made the advancement|reached the goal|completed the challenge) \\[(.+?)\\]").matcher(msg)).find()) {
+            if (!m.group(1).equals(botName)) io.github.yudiiee.aicompanion.GameAI.human.HumanReactions.advancement(server, botName, m.group(1), m.group(2));
+            return true;
+        }
+        if ((m = Pattern.compile("^(\\S+) left the game").matcher(msg)).find()) {
+            if (!m.group(1).equals(botName)) io.github.yudiiee.aicompanion.GameAI.human.HumanReactions.playerLeft(server, botName, m.group(1));
+            return true;
+        }
+        if ((m = Pattern.compile("^(\\S+) entered the Nether").matcher(msg)).find()) {
+            if (!m.group(1).equals(botName)) io.github.yudiiee.aicompanion.GameAI.human.HumanReactions.enteredNether(server, botName, m.group(1));
+            return true;
+        }
+        if ((m = Pattern.compile("^(\\S+) (?:found|mined|discovered) (?:a |an |some )?(diamonds?|netherite|ancient debris|emeralds?)", Pattern.CASE_INSENSITIVE).matcher(msg)).find()) {
+            if (!m.group(1).equals(botName)) io.github.yudiiee.aicompanion.GameAI.human.HumanReactions.foundValuable(server, botName, m.group(1), m.group(2).toLowerCase());
+            return true;
+        }
+        // Deaths: "<name> <death message>" — vanilla death messages all start with the victim's name
+        if ((m = Pattern.compile("^(\\S+) (was |drowned|fell|blew up|burned|froze|starved|suffocated|went up in flames|tried to swim in lava|died|hit the ground|experienced kinetic|walked into|withered|discovered the floor)(.*)").matcher(msg)).find()) {
+            String victim = m.group(1);
+            ServerPlayer vp = resolvePlayer(victim);
+            if (vp != null && !victim.equals(botName) && !io.github.yudiiee.aicompanion.GameAI.human.HumanBehavior.isBot(vp)) {
+                io.github.yudiiee.aicompanion.GameAI.human.HumanReactions.playerDied(server, botName, victim, m.group(2) + m.group(3));
+            }
+            return true;
+        }
+        return false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Stance trigger helpers  (Feature 1.6)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Attempts to match {@code messageBody} against every {@link #STANCE_TRIGGERS}
+     * entry.  On a match, resolves the target player name to a
+     * {@link ServerPlayer} (required by
+     * {@link CompanionController#setStance(String, BotStance, ServerPlayer)}),
+     * delegates the stance change, and injects a brief acknowledgement goal.
+     *
+     * @param sender      The player who sent the chat message.
+     * @param messageBody The body of the chat message (everything after {@code <sender> }).
+     * @return {@code true} if a stance trigger was matched and applied; {@code false}
+     *         if no trigger matched and normal social processing should continue.
+     */
+    private boolean applyStanceTrigger(String sender, String messageBody) {
+        for (StanceTrigger trigger : STANCE_TRIGGERS) {
+            Matcher m = trigger.pattern().matcher(messageBody);
+            if (!m.find()) continue;
+
+            BotStance newStance = trigger.stance();
+            CompanionController companion = CompanionController.getInstance();
+
+            switch (newStance) {
+                case FOLLOW -> {
+                    // Determine target name: explicit capture group(1) or fall back to sender
+                    String targetName = sender;
+                    try {
+                        String captured = m.group(1);
+                        if (captured != null && !captured.equalsIgnoreCase("me")) {
+                            targetName = captured;
+                        }
+                    } catch (IndexOutOfBoundsException ignored) {
+                        // pattern has no capture group -- targetName stays as sender
+                    }
+
+                    // Resolve String -> ServerPlayerEntity
+                    ServerPlayer targetPlayer = resolvePlayer(targetName);
+                    if (targetPlayer == null) {
+                        LOGGER.warn("[stance] FOLLOW requested but player '{}' is not online -- ignoring", targetName);
+                        return true; // trigger matched, but player offline; suppress further processing
+                    }
+
+                    companion.setStance(botName, BotStance.FOLLOW, targetPlayer);
+                    LOGGER.info("[stance] {} -> FOLLOW {}", botName, targetName);
+                    // acknowledged in chat by CompanionController
+                }
+                case STAY -> {
+                    companion.setStance(botName, BotStance.STAY, null);
+                    LOGGER.info("[stance] {} -> STAY", botName);
+                    // acknowledged in chat by CompanionController
+                }
+                case WANDER -> {
+                    companion.setStance(botName, BotStance.WANDER, null);
+                    LOGGER.info("[stance] {} -> WANDER", botName);
+                    // acknowledged in chat by CompanionController
+                }
+            }
+
+            return true; // trigger matched -- stop processing
+        }
+
+        return false; // no stance trigger matched
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Resolves a player name to a live {@link ServerPlayer}.
+     * Returns {@code null} if the server is unavailable or the player is offline.
+     */
+    private static ServerPlayer resolvePlayer(String playerName) {
+        if (AICompanion.serverInstance == null) return null;
+        return AICompanion.serverInstance.getPlayerList().getPlayerByName(playerName);
+    }
+}

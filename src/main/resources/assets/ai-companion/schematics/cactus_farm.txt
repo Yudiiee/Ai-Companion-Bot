@@ -1,0 +1,5 @@
+name: cactus farm
+aliases: cacti farm
+about: 7x7 of sand with 16 cactus spaced out so they don't break each other.
+ground: 0
+front: south

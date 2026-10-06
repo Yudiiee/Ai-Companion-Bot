@@ -1,5 +1,14 @@
 # AI Companion - Changelog
 
+## 1.1.0 (Minecraft 26.3)
+
+- New: building from schematics. Drop `.schem`, `.nbt` or `.litematic` files in `config/ai-companion/schematics` and
+  say "build the iron farm". The bot picks a spot next to the house (or "here", or "at x y z"), gathers what it can,
+  clears the area and builds it in order, then lists anything it couldn't get ("continue the build" to finish).
+- Starter designs: sugar cane farm, cactus farm, bamboo farm. The bot harvests and replants farms it built.
+- "what can you build", "what do you need for the X", "harvest the X", "forget the X".
+- Finished builds are protected from the bots' own mining and pathfinding; gathering never digs up a build.
+
 ## 1.0.0 (Minecraft 26.3)
 
 First release of AI Companion: companions that play survival like real people.

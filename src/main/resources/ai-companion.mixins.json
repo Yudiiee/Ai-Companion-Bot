@@ -1,0 +1,18 @@
+{
+	"required": false,
+	"package": "io.github.yudiiee.aicompanion.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": [
+		"ExampleMixin",
+		"PlayerDamageMixin",
+		"PlayerPickupMixin"
+	],
+	"client": [
+		"ScreenMixin",
+		"InGameHudMixin",
+		"WorldRendererMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}
