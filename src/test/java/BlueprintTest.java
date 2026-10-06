@@ -346,6 +346,55 @@ public class BlueprintTest {
         System.out.println("  iron farm, has to be brought: " + bring);
         check(ib.get("yellow_bed") == 3 && !ib.containsKey("water"), "beds counted once each, water isn't an item");
 
+        // ---------------- the recipe book ----------------
+        Path book = starters.getParent().resolve("recipes.txt");
+        int lines = 0, parsed = 0;
+        for (String line : Files.readAllLines(book)) {
+            if (!line.startsWith("RECIPE")) continue;
+            lines++;
+            if (RecipeBook.parseLine(line) != null) parsed++;
+        }
+        check(lines > 150 && parsed == lines, "every recipe line reads: " + parsed + "/" + lines);
+        Method read = RecipeBook.class.getDeclaredMethod("read", java.io.InputStream.class);
+        read.setAccessible(true);
+        Method use = RecipeBook.class.getDeclaredMethod("use", List.class);
+        use.setAccessible(true);
+        try (java.io.InputStream in = Files.newInputStream(book)) { use.invoke(null, read.invoke(null, in)); }
+        Field loaded = RecipeBook.class.getDeclaredField("loadedAt");
+        loaded.setAccessible(true);
+        loaded.set(null, Long.MAX_VALUE / 4);
+        check(RecipeBook.craftingFor("hopper").in().equals(Map.of("iron_ingot", 5, "chest", 1)), "hopper: 5 iron and a chest");
+        check(RecipeBook.craftingFor("dispenser").in().equals(Map.of("#stone_crafting", 7, "bow", 1, "redstone", 1)), "dispenser: ring of 7 with a bow and redstone");
+        check(RecipeBook.craftingFor("dropper").in().equals(Map.of("#stone_crafting", 7, "redstone", 1)), "dropper: 7 and redstone");
+        check(RecipeBook.craftingFor("smithing_table").in().equals(Map.of("iron_ingot", 2, "#planks", 4)), "smithing table");
+        check(RecipeBook.craftingFor("redstone_lamp").in().equals(Map.of("redstone", 4, "glowstone", 1)), "cross around a centre");
+        check(RecipeBook.craftingFor("recovery_compass").in().equals(Map.of("echo_shard", 8, "compass", 1)), "ring of 8 around a compass");
+        check(RecipeBook.craftingFor("smoker").in().equals(Map.of("#logs", 4, "furnace", 1)), "logs cross around a furnace");
+        check(RecipeBook.craftingFor("poplar_hanging_sign").in().get("iron_chain") == 2, "chain is iron_chain now");
+        check(RecipeBook.craftingFor("straw_bed").out() == 4 && RecipeBook.craftingFor("straw_bed").in().get("hay_block") == 3, "26.3 straw bed");
+        check(RecipeBook.craftingFor("netherite_sword").type().equals("smithing") && RecipeBook.cookingFor("smooth_stone").in().containsKey("stone"), "smithing and smelting");
+        check(RecipeBook.forItem("poplar_planks").get(0).in().containsKey("poplar_log"), "plain planks recipe first");
+        check("hopper".equals(RecipeBook.itemFor("a hopper")) && "iron_pickaxe".equals(RecipeBook.itemFor("iron pick"))
+                && "arrow".equals(RecipeBook.itemFor("arrows")) && RecipeBook.itemFor("pickaxe") == null, "item names");
+        check("hopper".equals(RecipeBook.howTo("how do i make a hopper")) && "blast furnace".equals(RecipeBook.howTo("what's the recipe for a blast furnace")),
+                "how-to questions");
+        String ans = RecipeBook.answer("hopper");
+        System.out.println("  " + ans);
+        check(ans.contains("5 iron ingot") && ans.contains("crafting table"), "explains a recipe");
+        System.out.println("  " + RecipeBook.answer("dispenser"));
+        System.out.println("  " + RecipeBook.answer("smooth stone"));
+        check(RecipeBook.mentioned("could you make me a beacon and a compass", 6).size() == 2, "recipes the chat is about");
+        Recipe(bbc, "blast_furnace");
+        check((boolean) obtainable.invoke(null, "blast_furnace", 0) && (boolean) obtainable.invoke(null, "stonecutter", 0)
+                && (boolean) obtainable.invoke(null, "crafter", 0) && !(boolean) obtainable.invoke(null, "beacon", 0), "what it can make with the book");
+        Method parseCraft = bbc.getDeclaredMethod("parseCraft", String.class);
+        parseCraft.setAccessible(true);
+        Object[] pc = (Object[]) parseCraft.invoke(null, "craft me 2 hoppers");
+        check(pc != null && pc[0].equals("hopper") && (int) pc[1] == 2, "craft me 2 hoppers");
+        Object[] pl = (Object[]) parseCraft.invoke(null, "make me a lantern");
+        check(pl != null && pl[0].equals("lantern"), "built-in recipes count too");
+        check(parseCraft.invoke(null, "make a pickaxe") == null && parseCraft.invoke(null, "make sugar") == null, "not everything is a craft");
+
         // ---------------- names ----------------
         List<Blueprints.Entry> entries = List.of(
                 entry("sugar cane farm", "cane farm", "sugarcane farm"),
@@ -382,6 +431,8 @@ public class BlueprintTest {
                 {"keep mining", "MINE"}, {"stop", "STOP"}, {"cancel", "STOP"},
                 {"what do you think about building a castle", "null"},
                 {"build a cactus farm next to the house", "BLUEPRINT"}, {"make sugar", "null"}, {"make some cactus", "null"},
+                {"how do i make a hopper", "RECIPE"}, {"what's the recipe for a crafter", "RECIPE"}, {"craft me 2 hoppers", "MAKE"},
+                {"craft an iron pickaxe", "MAKE"}, {"craft a pickaxe", "COLLECT"}, {"make me a chest", "COLLECT"},
                 {"what kind of tree is that", "TREE"}, {"where can i find cherry wood", "TREE"}, {"build the medieval inn", "BLUEPRINT"},
         };
         for (String[] c : cases) {
@@ -401,6 +452,12 @@ public class BlueprintTest {
 
         System.out.println(fails == 0 ? "ALL PASSED" : (fails + " FAILED"));
         System.exit(fails == 0 ? 0 : 1);
+    }
+
+    static void Recipe(Class<?> bbc, String item) throws Exception {
+        Method rf = bbc.getDeclaredMethod("recipeFor", String.class);
+        rf.setAccessible(true);
+        System.out.println("  builder recipe for " + item + ": " + rf.invoke(null, item));
     }
 
     static Object call(Object o, String m) throws Exception {

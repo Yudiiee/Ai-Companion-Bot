@@ -1,0 +1,201 @@
+# ==============================================================================
+# MINECRAFT JAVA 26.3 COMPREHENSIVE RECIPE KNOWLEDGE BASE
+# TARGET FORMAT: LLM Memory Ingestion / Vector RAG / Agent Tool Lookup
+# SCHEMA:
+# RECIPE | ID: <recipe_id> | TYPE: <crafting|smelting|blasting|smoking|smithing|stonecutting> | WORKSTATION: <block> | INPUTS: <ingredients> | OUTPUT: <count>x <result_id>
+# TAG ALIASES:
+#   #planks = any wooden plank
+#   #logs = any wooden log/stem
+#   #stone_crafting = cobblestone, blackstone, cobbled_deepslate
+#   #wooden_slabs = any wooden slab
+# ==============================================================================
+
+### SECTION 1: 26.3 WILDERNESS & DECORATIVE ADDITIONS
+RECIPE | ID: minecraft:straw_bed | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:hay_block] | OUTPUT: 4x minecraft:straw_bed
+RECIPE | ID: minecraft:poplar_planks | TYPE: shapeless | WORKSTATION: inventory | INPUTS: [1x poplar_log] | OUTPUT: 4x minecraft:poplar_planks
+RECIPE | ID: minecraft:poplar_planks_from_stripped | TYPE: shapeless | WORKSTATION: inventory | INPUTS: [1x stripped_poplar_log] | OUTPUT: 4x minecraft:poplar_planks
+RECIPE | ID: minecraft:poplar_planks_from_wood | TYPE: shapeless | WORKSTATION: inventory | INPUTS: [1x poplar_wood] | OUTPUT: 4x minecraft:poplar_planks
+RECIPE | ID: minecraft:poplar_wood | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [2x2:poplar_log] | OUTPUT: 3x minecraft:poplar_wood
+RECIPE | ID: minecraft:stripped_poplar_wood | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [2x2:stripped_poplar_log] | OUTPUT: 3x minecraft:stripped_poplar_wood
+RECIPE | ID: minecraft:poplar_stairs | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [stairs_shape:poplar_planks] | OUTPUT: 4x minecraft:poplar_stairs
+RECIPE | ID: minecraft:poplar_slab | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:poplar_planks] | OUTPUT: 6x minecraft:poplar_slab
+RECIPE | ID: minecraft:poplar_fence | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [poplar_planks,stick,poplar_planks / poplar_planks,stick,poplar_planks] | OUTPUT: 3x minecraft:poplar_fence
+RECIPE | ID: minecraft:poplar_fence_gate | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [stick,poplar_planks,stick / stick,poplar_planks,stick] | OUTPUT: 1x minecraft:poplar_fence_gate
+RECIPE | ID: minecraft:poplar_door | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [2x3:poplar_planks] | OUTPUT: 3x minecraft:poplar_door
+RECIPE | ID: minecraft:poplar_trapdoor | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [3x2:poplar_planks] | OUTPUT: 2x minecraft:poplar_trapdoor
+RECIPE | ID: minecraft:poplar_pressure_plate | TYPE: shaped | WORKSTATION: inventory | INPUTS: [1,1:poplar_planks] | OUTPUT: 1x minecraft:poplar_pressure_plate
+RECIPE | ID: minecraft:poplar_button | TYPE: shapeless | WORKSTATION: inventory | INPUTS: [1x poplar_planks] | OUTPUT: 1x minecraft:poplar_button
+RECIPE | ID: minecraft:poplar_sign | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [3x2:poplar_planks, bottom_center:stick] | OUTPUT: 3x minecraft:poplar_sign
+RECIPE | ID: minecraft:poplar_hanging_sign | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [chain,none,chain / 3x2:stripped_poplar_log] | OUTPUT: 6x minecraft:poplar_hanging_sign
+RECIPE | ID: minecraft:poplar_boat | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [boat_shape:poplar_planks] | OUTPUT: 1x minecraft:poplar_boat
+RECIPE | ID: minecraft:poplar_chest_boat | TYPE: shapeless | WORKSTATION: inventory | INPUTS: [1x chest, 1x poplar_boat] | OUTPUT: 1x minecraft:poplar_chest_boat
+RECIPE | ID: minecraft:mushroom_stew_bracket_fungus | TYPE: shapeless | WORKSTATION: inventory | INPUTS: [bowl, bracket_fungus, red_mushroom] | OUTPUT: 1x minecraft:mushroom_stew
+
+### SECTION 2: WOOL STAIRS, SLABS & CUSHIONS (ALL 16 COLORS)
+RECIPE | ID: minecraft:white_wool_stairs | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [stairs_shape:white_wool] | OUTPUT: 4x minecraft:white_wool_stairs
+RECIPE | ID: minecraft:white_wool_slab | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:white_wool] | OUTPUT: 6x minecraft:white_wool_slab
+RECIPE | ID: minecraft:white_cushion | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:white_wool_slab] | OUTPUT: 1x minecraft:white_cushion
+RECIPE | ID: minecraft:orange_wool_stairs | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [stairs_shape:orange_wool] | OUTPUT: 4x minecraft:orange_wool_stairs
+RECIPE | ID: minecraft:orange_wool_slab | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:orange_wool] | OUTPUT: 6x minecraft:orange_wool_slab
+RECIPE | ID: minecraft:orange_cushion | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:orange_wool_slab] | OUTPUT: 1x minecraft:orange_cushion
+RECIPE | ID: minecraft:magenta_wool_stairs | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [stairs_shape:magenta_wool] | OUTPUT: 4x minecraft:magenta_wool_stairs
+RECIPE | ID: minecraft:magenta_wool_slab | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:magenta_wool] | OUTPUT: 6x minecraft:magenta_wool_slab
+RECIPE | ID: minecraft:magenta_cushion | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:magenta_wool_slab] | OUTPUT: 1x minecraft:magenta_cushion
+RECIPE | ID: minecraft:light_blue_wool_stairs | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [stairs_shape:light_blue_wool] | OUTPUT: 4x minecraft:light_blue_wool_stairs
+RECIPE | ID: minecraft:light_blue_wool_slab | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:light_blue_wool] | OUTPUT: 6x minecraft:light_blue_wool_slab
+RECIPE | ID: minecraft:light_blue_cushion | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:light_blue_wool_slab] | OUTPUT: 1x minecraft:light_blue_cushion
+RECIPE | ID: minecraft:yellow_wool_stairs | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [stairs_shape:yellow_wool] | OUTPUT: 4x minecraft:yellow_wool_stairs
+RECIPE | ID: minecraft:yellow_wool_slab | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:yellow_wool] | OUTPUT: 6x minecraft:yellow_wool_slab
+RECIPE | ID: minecraft:yellow_cushion | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:yellow_wool_slab] | OUTPUT: 1x minecraft:yellow_cushion
+RECIPE | ID: minecraft:lime_wool_stairs | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [stairs_shape:lime_wool] | OUTPUT: 4x minecraft:lime_wool_stairs
+RECIPE | ID: minecraft:lime_wool_slab | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:lime_wool] | OUTPUT: 6x minecraft:lime_wool_slab
+RECIPE | ID: minecraft:lime_cushion | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:lime_wool_slab] | OUTPUT: 1x minecraft:lime_cushion
+RECIPE | ID: minecraft:pink_wool_stairs | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [stairs_shape:pink_wool] | OUTPUT: 4x minecraft:pink_wool_stairs
+RECIPE | ID: minecraft:pink_wool_slab | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:pink_wool] | OUTPUT: 6x minecraft:pink_wool_slab
+RECIPE | ID: minecraft:pink_cushion | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:pink_wool_slab] | OUTPUT: 1x minecraft:pink_cushion
+RECIPE | ID: minecraft:gray_wool_stairs | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [stairs_shape:gray_wool] | OUTPUT: 4x minecraft:gray_wool_stairs
+RECIPE | ID: minecraft:gray_wool_slab | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:gray_wool] | OUTPUT: 6x minecraft:gray_wool_slab
+RECIPE | ID: minecraft:gray_cushion | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:gray_wool_slab] | OUTPUT: 1x minecraft:gray_cushion
+RECIPE | ID: minecraft:light_gray_wool_stairs | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [stairs_shape:light_gray_wool] | OUTPUT: 4x minecraft:light_gray_wool_stairs
+RECIPE | ID: minecraft:light_gray_wool_slab | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:light_gray_wool] | OUTPUT: 6x minecraft:light_gray_wool_slab
+RECIPE | ID: minecraft:light_gray_cushion | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:light_gray_wool_slab] | OUTPUT: 1x minecraft:light_gray_cushion
+RECIPE | ID: minecraft:cyan_wool_stairs | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [stairs_shape:cyan_wool] | OUTPUT: 4x minecraft:cyan_wool_stairs
+RECIPE | ID: minecraft:cyan_wool_slab | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:cyan_wool] | OUTPUT: 6x minecraft:cyan_wool_slab
+RECIPE | ID: minecraft:cyan_cushion | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:cyan_wool_slab] | OUTPUT: 1x minecraft:cyan_cushion
+RECIPE | ID: minecraft:purple_wool_stairs | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [stairs_shape:purple_wool] | OUTPUT: 4x minecraft:purple_wool_stairs
+RECIPE | ID: minecraft:purple_wool_slab | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:purple_wool] | OUTPUT: 6x minecraft:purple_wool_slab
+RECIPE | ID: minecraft:purple_cushion | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:purple_wool_slab] | OUTPUT: 1x minecraft:purple_cushion
+RECIPE | ID: minecraft:blue_wool_stairs | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [stairs_shape:blue_wool] | OUTPUT: 4x minecraft:blue_wool_stairs
+RECIPE | ID: minecraft:blue_wool_slab | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:blue_wool] | OUTPUT: 6x minecraft:blue_wool_slab
+RECIPE | ID: minecraft:blue_cushion | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:blue_wool_slab] | OUTPUT: 1x minecraft:blue_cushion
+RECIPE | ID: minecraft:brown_wool_stairs | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [stairs_shape:brown_wool] | OUTPUT: 4x minecraft:brown_wool_stairs
+RECIPE | ID: minecraft:brown_wool_slab | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:brown_wool] | OUTPUT: 6x minecraft:brown_wool_slab
+RECIPE | ID: minecraft:brown_cushion | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:brown_wool_slab] | OUTPUT: 1x minecraft:brown_cushion
+RECIPE | ID: minecraft:green_wool_stairs | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [stairs_shape:green_wool] | OUTPUT: 4x minecraft:green_wool_stairs
+RECIPE | ID: minecraft:green_wool_slab | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:green_wool] | OUTPUT: 6x minecraft:green_wool_slab
+RECIPE | ID: minecraft:green_cushion | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:green_wool_slab] | OUTPUT: 1x minecraft:green_cushion
+RECIPE | ID: minecraft:red_wool_stairs | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [stairs_shape:red_wool] | OUTPUT: 4x minecraft:red_wool_stairs
+RECIPE | ID: minecraft:red_wool_slab | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:red_wool] | OUTPUT: 6x minecraft:red_wool_slab
+RECIPE | ID: minecraft:red_cushion | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:red_wool_slab] | OUTPUT: 1x minecraft:red_cushion
+RECIPE | ID: minecraft:black_wool_stairs | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [stairs_shape:black_wool] | OUTPUT: 4x minecraft:black_wool_stairs
+RECIPE | ID: minecraft:black_wool_slab | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:black_wool] | OUTPUT: 6x minecraft:black_wool_slab
+RECIPE | ID: minecraft:black_cushion | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:black_wool_slab] | OUTPUT: 1x minecraft:black_cushion
+
+### SECTION 3: WORKSTATIONS & ESSENTIAL BLOCKS
+RECIPE | ID: minecraft:crafting_table | TYPE: shaped | WORKSTATION: inventory | INPUTS: [2x2:#planks] | OUTPUT: 1x minecraft:crafting_table
+RECIPE | ID: minecraft:furnace | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [ring:#stone_crafting] | OUTPUT: 1x minecraft:furnace
+RECIPE | ID: minecraft:blast_furnace | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [iron_ingot*3 / iron_ingot,furnace,iron_ingot / smooth_stone*3] | OUTPUT: 1x minecraft:blast_furnace
+RECIPE | ID: minecraft:smoker | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [#logs cross around furnace] | OUTPUT: 1x minecraft:smoker
+RECIPE | ID: minecraft:campfire | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [stick*3, coal*1, #logs*3] | OUTPUT: 1x minecraft:campfire
+RECIPE | ID: minecraft:soul_campfire | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [stick*3, soul_soil_or_sand*1, #logs*3] | OUTPUT: 1x minecraft:soul_campfire
+RECIPE | ID: minecraft:chest | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [ring:#planks] | OUTPUT: 1x minecraft:chest
+RECIPE | ID: minecraft:barrel | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [#planks*6, #wooden_slabs*2] | OUTPUT: 1x minecraft:barrel
+RECIPE | ID: minecraft:stonecutter | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top_center:iron_ingot, bottom:stone*3] | OUTPUT: 1x minecraft:stonecutter
+RECIPE | ID: minecraft:anvil | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top:iron_block*3, mid:iron_ingot, bottom:iron_ingot*3] | OUTPUT: 1x minecraft:anvil
+RECIPE | ID: minecraft:smithing_table | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top:iron_ingot*2, bottom:2x2:#planks] | OUTPUT: 1x minecraft:smithing_table
+RECIPE | ID: minecraft:grindstone | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [stick,stone_slab,stick / #planks,none,#planks] | OUTPUT: 1x minecraft:grindstone
+RECIPE | ID: minecraft:brewing_stand | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [center:blaze_rod, bottom:#stone_crafting*3] | OUTPUT: 1x minecraft:brewing_stand
+RECIPE | ID: minecraft:cauldron | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [U_shape:iron_ingot*7] | OUTPUT: 1x minecraft:cauldron
+RECIPE | ID: minecraft:composter | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [U_shape:#wooden_slabs*7] | OUTPUT: 1x minecraft:composter
+RECIPE | ID: minecraft:cartography_table | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top:paper*2, bottom:2x2:#planks] | OUTPUT: 1x minecraft:cartography_table
+RECIPE | ID: minecraft:fletching_table | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top:flint*2, bottom:2x2:#planks] | OUTPUT: 1x minecraft:fletching_table
+RECIPE | ID: minecraft:loom | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top:string*2, bottom:2x2:#planks] | OUTPUT: 1x minecraft:loom
+RECIPE | ID: minecraft:enchanting_table | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top_center:book / diamond,obsidian,diamond / obsidian*3] | OUTPUT: 1x minecraft:enchanting_table
+RECIPE | ID: minecraft:bookshelf | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top:#planks*3 / mid:book*3 / bottom:#planks*3] | OUTPUT: 1x minecraft:bookshelf
+RECIPE | ID: minecraft:chiseled_bookshelf | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top:#planks*3 / mid:#wooden_slabs*3 / bottom:#planks*3] | OUTPUT: 1x minecraft:chiseled_bookshelf
+
+### SECTION 4: REDSTONE & AUTOMATION
+RECIPE | ID: minecraft:crafter | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top:iron_ingot*3 / mid:iron_ingot,crafting_table,iron_ingot / bottom:redstone,dropper,redstone] | OUTPUT: 1x minecraft:crafter
+RECIPE | ID: minecraft:copper_bulb | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [copper_block*3, blaze_rod*1, redstone*1] | OUTPUT: 4x minecraft:copper_bulb
+RECIPE | ID: minecraft:piston | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top:#planks*3 / #stone_crafting,iron_ingot,#stone_crafting / #stone_crafting,redstone,#stone_crafting] | OUTPUT: 1x minecraft:piston
+RECIPE | ID: minecraft:sticky_piston | TYPE: shapeless | WORKSTATION: inventory | INPUTS: [piston, slime_ball] | OUTPUT: 1x minecraft:sticky_piston
+RECIPE | ID: minecraft:repeater | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [redstone_torch,redstone,redstone_torch / stone*3] | OUTPUT: 1x minecraft:repeater
+RECIPE | ID: minecraft:comparator | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [none,redstone_torch,none / redstone_torch,quartz,redstone_torch / stone*3] | OUTPUT: 1x minecraft:comparator
+RECIPE | ID: minecraft:observer | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [#stone_crafting*3 / redstone,redstone,quartz / #stone_crafting*3] | OUTPUT: 1x minecraft:observer
+RECIPE | ID: minecraft:dispenser | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [ring:#stone_crafting with center:bow, bottom:redstone] | OUTPUT: 1x minecraft:dispenser
+RECIPE | ID: minecraft:dropper | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [ring:#stone_crafting with bottom:redstone] | OUTPUT: 1x minecraft:dropper
+RECIPE | ID: minecraft:hopper | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [iron_ingot,none,iron_ingot / iron_ingot,chest,iron_ingot / none,iron_ingot,none] | OUTPUT: 1x minecraft:hopper
+RECIPE | ID: minecraft:daylight_detector | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top:glass*3 / mid:quartz*3 / bottom:#wooden_slabs*3] | OUTPUT: 1x minecraft:daylight_detector
+RECIPE | ID: minecraft:redstone_torch | TYPE: shaped | WORKSTATION: inventory | INPUTS: [top:redstone, bottom:stick] | OUTPUT: 1x minecraft:redstone_torch
+RECIPE | ID: minecraft:redstone_lamp | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [cross:redstone*4 around center:glowstone] | OUTPUT: 1x minecraft:redstone_lamp
+RECIPE | ID: minecraft:target | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [cross:redstone*4 around center:hay_block] | OUTPUT: 1x minecraft:target
+RECIPE | ID: minecraft:tripwire_hook | TYPE: shaped | WORKSTATION: inventory | INPUTS: [top:iron_ingot, mid:stick, bottom:#planks] | OUTPUT: 2x minecraft:tripwire_hook
+
+### SECTION 5: COMBAT, TOOLS & SMITHING
+RECIPE | ID: minecraft:mace | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top_center:heavy_core, mid_center:breeze_rod, bot_center:breeze_rod] | OUTPUT: 1x minecraft:mace
+RECIPE | ID: minecraft:wind_charge | TYPE: shapeless | WORKSTATION: inventory | INPUTS: [1x breeze_rod] | OUTPUT: 4x minecraft:wind_charge
+RECIPE | ID: minecraft:bow | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [stick,string / stick,none,string / stick,string] | OUTPUT: 1x minecraft:bow
+RECIPE | ID: minecraft:crossbow | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [stick,iron_ingot,stick / string,tripwire_hook,string / none,stick,none] | OUTPUT: 1x minecraft:crossbow
+RECIPE | ID: minecraft:arrow | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top:flint, mid:stick, bottom:feather] | OUTPUT: 4x minecraft:arrow
+RECIPE | ID: minecraft:shield | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top:#planks,iron_ingot,#planks / mid:#planks*3 / bot_center:#planks] | OUTPUT: 1x minecraft:shield
+RECIPE | ID: minecraft:wooden_sword | TYPE: shaped | WORKSTATION: inventory | INPUTS: [top:#planks, mid:#planks, bottom:stick] | OUTPUT: 1x minecraft:wooden_sword
+RECIPE | ID: minecraft:stone_sword | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top:#stone_crafting, mid:#stone_crafting, bottom:stick] | OUTPUT: 1x minecraft:stone_sword
+RECIPE | ID: minecraft:iron_sword | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top:iron_ingot, mid:iron_ingot, bottom:stick] | OUTPUT: 1x minecraft:iron_sword
+RECIPE | ID: minecraft:diamond_sword | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top:diamond, mid:diamond, bottom:stick] | OUTPUT: 1x minecraft:diamond_sword
+RECIPE | ID: minecraft:iron_pickaxe | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top:iron_ingot*3, mid:stick, bottom:stick] | OUTPUT: 1x minecraft:iron_pickaxe
+RECIPE | ID: minecraft:iron_axe | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top:iron_ingot*2 / mid:iron_ingot,stick / bottom:none,stick] | OUTPUT: 1x minecraft:iron_axe
+RECIPE | ID: minecraft:iron_shovel | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top:iron_ingot, mid:stick, bottom:stick] | OUTPUT: 1x minecraft:iron_shovel
+RECIPE | ID: minecraft:iron_hoe | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top:iron_ingot*2, mid_center:stick, bot_center:stick] | OUTPUT: 1x minecraft:iron_hoe
+RECIPE | ID: minecraft:diamond_pickaxe | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top:diamond*3, mid_center:stick, bot_center:stick] | OUTPUT: 1x minecraft:diamond_pickaxe
+RECIPE | ID: minecraft:diamond_axe | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top:diamond*2 / mid:diamond,stick / bot_center:stick] | OUTPUT: 1x minecraft:diamond_axe
+RECIPE | ID: minecraft:diamond_shovel | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top:diamond, mid:stick, bottom:stick] | OUTPUT: 1x minecraft:diamond_shovel
+RECIPE | ID: minecraft:diamond_hoe | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top:diamond*2, mid_center:stick, bot_center:stick] | OUTPUT: 1x minecraft:diamond_hoe
+RECIPE | ID: minecraft:iron_helmet | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [n_shape:iron_ingot*5] | OUTPUT: 1x minecraft:iron_helmet
+RECIPE | ID: minecraft:iron_chestplate | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [chestplate_shape:iron_ingot*8] | OUTPUT: 1x minecraft:iron_chestplate
+RECIPE | ID: minecraft:iron_leggings | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [pants_shape:iron_ingot*7] | OUTPUT: 1x minecraft:iron_leggings
+RECIPE | ID: minecraft:iron_boots | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [boots_shape:iron_ingot*4] | OUTPUT: 1x minecraft:iron_boots
+RECIPE | ID: minecraft:diamond_helmet | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [n_shape:diamond*5] | OUTPUT: 1x minecraft:diamond_helmet
+RECIPE | ID: minecraft:diamond_chestplate | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [chestplate_shape:diamond*8] | OUTPUT: 1x minecraft:diamond_chestplate
+RECIPE | ID: minecraft:diamond_leggings | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [pants_shape:diamond*7] | OUTPUT: 1x minecraft:diamond_leggings
+RECIPE | ID: minecraft:diamond_boots | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [boots_shape:diamond*4] | OUTPUT: 1x minecraft:diamond_boots
+RECIPE | ID: minecraft:netherite_sword_smithing | TYPE: smithing | WORKSTATION: smithing_table | INPUTS: [template:netherite_upgrade_smithing_template, base:diamond_sword, add:netherite_ingot] | OUTPUT: 1x minecraft:netherite_sword
+RECIPE | ID: minecraft:netherite_pickaxe_smithing | TYPE: smithing | WORKSTATION: smithing_table | INPUTS: [template:netherite_upgrade_smithing_template, base:diamond_pickaxe, add:netherite_ingot] | OUTPUT: 1x minecraft:netherite_pickaxe
+RECIPE | ID: minecraft:netherite_axe_smithing | TYPE: smithing | WORKSTATION: smithing_table | INPUTS: [template:netherite_upgrade_smithing_template, base:diamond_axe, add:netherite_ingot] | OUTPUT: 1x minecraft:netherite_axe
+RECIPE | ID: minecraft:netherite_shovel_smithing | TYPE: smithing | WORKSTATION: smithing_table | INPUTS: [template:netherite_upgrade_smithing_template, base:diamond_shovel, add:netherite_ingot] | OUTPUT: 1x minecraft:netherite_shovel
+RECIPE | ID: minecraft:netherite_hoe_smithing | TYPE: smithing | WORKSTATION: smithing_table | INPUTS: [template:netherite_upgrade_smithing_template, base:diamond_hoe, add:netherite_ingot] | OUTPUT: 1x minecraft:netherite_hoe
+RECIPE | ID: minecraft:netherite_helmet_smithing | TYPE: smithing | WORKSTATION: smithing_table | INPUTS: [template:netherite_upgrade_smithing_template, base:diamond_helmet, add:netherite_ingot] | OUTPUT: 1x minecraft:netherite_helmet
+RECIPE | ID: minecraft:netherite_chestplate_smithing | TYPE: smithing | WORKSTATION: smithing_table | INPUTS: [template:netherite_upgrade_smithing_template, base:diamond_chestplate, add:netherite_ingot] | OUTPUT: 1x minecraft:netherite_chestplate
+RECIPE | ID: minecraft:netherite_leggings_smithing | TYPE: smithing | WORKSTATION: smithing_table | INPUTS: [template:netherite_upgrade_smithing_template, base:diamond_leggings, add:netherite_ingot] | OUTPUT: 1x minecraft:netherite_leggings
+RECIPE | ID: minecraft:netherite_boots_smithing | TYPE: smithing | WORKSTATION: smithing_table | INPUTS: [template:netherite_upgrade_smithing_template, base:diamond_boots, add:netherite_ingot] | OUTPUT: 1x minecraft:netherite_boots
+
+### SECTION 6: SMELTING, BLASTING & SMOKING (FURNACE MATRIX)
+RECIPE | ID: minecraft:iron_ingot_smelting | TYPE: smelting | WORKSTATION: furnace | INPUTS: [raw_iron] | OUTPUT: 1x minecraft:iron_ingot
+RECIPE | ID: minecraft:gold_ingot_smelting | TYPE: smelting | WORKSTATION: furnace | INPUTS: [raw_gold] | OUTPUT: 1x minecraft:gold_ingot
+RECIPE | ID: minecraft:copper_ingot_smelting | TYPE: smelting | WORKSTATION: furnace | INPUTS: [raw_copper] | OUTPUT: 1x minecraft:copper_ingot
+RECIPE | ID: minecraft:iron_ingot_blasting | TYPE: blasting | WORKSTATION: blast_furnace | INPUTS: [raw_iron] | OUTPUT: 1x minecraft:iron_ingot
+RECIPE | ID: minecraft:gold_ingot_blasting | TYPE: blasting | WORKSTATION: blast_furnace | INPUTS: [raw_gold] | OUTPUT: 1x minecraft:gold_ingot
+RECIPE | ID: minecraft:copper_ingot_blasting | TYPE: blasting | WORKSTATION: blast_furnace | INPUTS: [raw_copper] | OUTPUT: 1x minecraft:copper_ingot
+RECIPE | ID: minecraft:cooked_beef_smoking | TYPE: smoking | WORKSTATION: smoker | INPUTS: [beef] | OUTPUT: 1x minecraft:cooked_beef
+RECIPE | ID: minecraft:cooked_porkchop_smoking | TYPE: smoking | WORKSTATION: smoker | INPUTS: [porkchop] | OUTPUT: 1x minecraft:cooked_porkchop
+RECIPE | ID: minecraft:cooked_mutton_smoking | TYPE: smoking | WORKSTATION: smoker | INPUTS: [mutton] | OUTPUT: 1x minecraft:cooked_mutton
+RECIPE | ID: minecraft:cooked_chicken_smoking | TYPE: smoking | WORKSTATION: smoker | INPUTS: [chicken] | OUTPUT: 1x minecraft:cooked_chicken
+RECIPE | ID: minecraft:glass_smelting | TYPE: smelting | WORKSTATION: furnace | INPUTS: [sand] | OUTPUT: 1x minecraft:glass
+RECIPE | ID: minecraft:stone_smelting | TYPE: smelting | WORKSTATION: furnace | INPUTS: [cobblestone] | OUTPUT: 1x minecraft:stone
+RECIPE | ID: minecraft:smooth_stone_smelting | TYPE: smelting | WORKSTATION: furnace | INPUTS: [stone] | OUTPUT: 1x minecraft:smooth_stone
+
+### SECTION 7: TRANSPORTATION & NAVIGATION
+RECIPE | ID: minecraft:rail | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [iron_ingot,none,iron_ingot / iron_ingot,stick,iron_ingot / iron_ingot,none,iron_ingot] | OUTPUT: 16x minecraft:rail
+RECIPE | ID: minecraft:powered_rail | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [gold_ingot,none,gold_ingot / gold_ingot,stick,gold_ingot / gold_ingot,redstone,gold_ingot] | OUTPUT: 6x minecraft:powered_rail
+RECIPE | ID: minecraft:detector_rail | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [iron_ingot,none,iron_ingot / iron_ingot,stone_pressure_plate,iron_ingot / iron_ingot,redstone,iron_ingot] | OUTPUT: 6x minecraft:detector_rail
+RECIPE | ID: minecraft:activator_rail | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [iron_ingot,stick,iron_ingot / iron_ingot,redstone_torch,iron_ingot / iron_ingot,stick,iron_ingot] | OUTPUT: 6x minecraft:activator_rail
+RECIPE | ID: minecraft:minecart | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [U_shape:iron_ingot*5] | OUTPUT: 1x minecraft:minecart
+RECIPE | ID: minecraft:chest_minecart | TYPE: shapeless | WORKSTATION: inventory | INPUTS: [minecart, chest] | OUTPUT: 1x minecraft:chest_minecart
+RECIPE | ID: minecraft:hopper_minecart | TYPE: shapeless | WORKSTATION: inventory | INPUTS: [minecart, hopper] | OUTPUT: 1x minecraft:hopper_minecart
+RECIPE | ID: minecraft:tnt_minecart | TYPE: shapeless | WORKSTATION: inventory | INPUTS: [minecart, tnt] | OUTPUT: 1x minecraft:tnt_minecart
+RECIPE | ID: minecraft:spyglass | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [top_center:amethyst_shard, mid_center:copper_ingot, bot_center:copper_ingot] | OUTPUT: 1x minecraft:spyglass
+RECIPE | ID: minecraft:compass | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [cross:iron_ingot*4 around redstone] | OUTPUT: 1x minecraft:compass
+RECIPE | ID: minecraft:recovery_compass | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [ring:echo_shard*8 around compass] | OUTPUT: 1x minecraft:recovery_compass
+
+### SECTION 8: UTILITY, SURVIVAL & END-GAME
+RECIPE | ID: minecraft:bread | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [1,1,1:wheat] | OUTPUT: 1x minecraft:bread
+RECIPE | ID: minecraft:golden_carrot | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [ring:gold_nugget*8 around carrot] | OUTPUT: 1x minecraft:golden_carrot
+RECIPE | ID: minecraft:golden_apple | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [ring:gold_ingot*8 around apple] | OUTPUT: 1x minecraft:golden_apple
+RECIPE | ID: minecraft:ender_chest | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [ring:obsidian*8 around ender_eye] | OUTPUT: 1x minecraft:ender_chest
+RECIPE | ID: minecraft:ender_eye | TYPE: shapeless | WORKSTATION: inventory | INPUTS: [ender_pearl, blaze_powder] | OUTPUT: 1x minecraft:ender_eye
+RECIPE | ID: minecraft:respawn_anchor | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [crying_obsidian*3 / glowstone*3 / crying_obsidian*3] | OUTPUT: 1x minecraft:respawn_anchor
+RECIPE | ID: minecraft:lodestone | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [ring:chiseled_stone_bricks*8 around netherite_ingot] | OUTPUT: 1x minecraft:lodestone
+RECIPE | ID: minecraft:beacon | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [glass*3 / glass,nether_star,glass / obsidian*3] | OUTPUT: 1x minecraft:beacon
+RECIPE | ID: minecraft:conduit | TYPE: shaped | WORKSTATION: crafting_table | INPUTS: [ring:nautilus_shell*8 around heart_of_the_sea] | OUTPUT: 1x minecraft:conduit
+# ==============================================================================
+# END OF RECIPE FILE
+# ==============================================================================

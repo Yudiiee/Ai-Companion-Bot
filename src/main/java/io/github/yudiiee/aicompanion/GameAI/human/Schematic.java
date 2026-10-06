@@ -547,7 +547,7 @@ public final class Schematic {
         }
 
         private static final String[] SPECIES = {"dark_oak", "pale_oak", "oak", "spruce", "birch", "jungle", "acacia",
-                "mangrove", "cherry", "crimson", "warped", "bamboo"};
+                "mangrove", "cherry", "crimson", "warped", "bamboo", "poplar"};
         private static final java.util.Set<String> WOOD_KINDS = java.util.Set.of("planks", "log", "wood", "stairs", "slab",
                 "fence", "fence_gate", "trapdoor", "door", "pressure_plate", "button", "sign", "wall_sign", "hanging_sign",
                 "wall_hanging_sign", "stripped_log", "stripped_wood");

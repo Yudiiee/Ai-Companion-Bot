@@ -53,6 +53,9 @@ public final class Woods {
                 0xE3D9D5, false);
         w("bamboo", "bamboo (not really a tree: 9 bamboo make a block)", "jungles and bamboo jungles", "yellow",
                 "green-yellow", "yellow", 0xC2AD50, false);
+        // new in 26.3 (from the recipe book); colour not known yet, so it's never picked as a stand-in
+        w("poplar", "poplar tree (new in 26.3)", "not sure yet, i haven't seen one", "not sure yet", "not sure yet",
+                "not sure yet", -1, false);
         w("crimson", "crimson fungus, a giant red mushroom tree", "crimson forests in the Nether", "magenta red",
                 "dark red", "red-purple", 0x653046, true);
         w("warped", "warped fungus, a giant teal mushroom tree", "warped forests in the Nether", "teal",
@@ -88,8 +91,10 @@ public final class Woods {
     public static List<String> closest(String species) {
         Wood me = WOODS.get(species);
         List<Wood> others = new ArrayList<>();
-        for (Wood x : WOODS.values()) if (!x.species().equals(species) && !x.species().equals("bamboo")) others.add(x);
-        if (me == null) return others.stream().map(Wood::species).toList();
+        for (Wood x : WOODS.values()) {
+            if (!x.species().equals(species) && !x.species().equals("bamboo") && x.rgb() >= 0) others.add(x);
+        }
+        if (me == null || me.rgb() < 0) return others.stream().map(Wood::species).toList();
         others.sort(Comparator.comparingDouble(x -> distance(me.rgb(), x.rgb())));
         return others.stream().map(Wood::species).toList();
     }
@@ -165,11 +170,11 @@ public final class Woods {
             "\\b(what|which)( kind of| type of| sort of)? (tree|wood|log|logs|planks|leaves)( is| are)? (this|that|these|those|it|here)\\b"
             + "|\\bwhat (is|'s) (this|that) (tree|wood|log)\\b"
             + "|\\b(tell me about|what do you know about|where (do|does|can) (i|you|we) (find|get))( the)? "
-            + "(oak|spruce|birch|jungle|acacia|dark oak|mangrove|cherry|pale oak|bamboo|crimson|warped)( trees?| wood| logs?| planks)?\\b"
+            + "(oak|spruce|birch|jungle|acacia|dark oak|mangrove|cherry|pale oak|bamboo|crimson|warped|poplar)( trees?| wood| logs?| planks)?\\b"
             + "|\\b(what|which) (woods?|trees?) (are there|do you know|can you (get|find|chop))\\b");
 
     private static final java.util.regex.Pattern NAMED = java.util.regex.Pattern.compile(
-            "\\b(dark oak|pale oak|oak|spruce|birch|jungle|acacia|mangrove|cherry|bamboo|crimson|warped)\\b");
+            "\\b(dark oak|pale oak|oak|spruce|birch|jungle|acacia|mangrove|cherry|bamboo|crimson|warped|poplar)\\b");
 
     /** A question about trees or wood? */
     public static boolean isQuestion(String m) {

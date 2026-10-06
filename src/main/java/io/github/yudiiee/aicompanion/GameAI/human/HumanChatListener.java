@@ -57,7 +57,7 @@ public final class HumanChatListener {
     // Commands understood locally
     // ------------------------------------------------------------------------
 
-    public enum Local { FOLLOW, STAY, WANDER, COME, GIVE, INVENTORY, CRAFT, PVP, DIG, STRIP, COLLECT, FARM, ORE, WOOD, MINE, PLAY, STOP, HOUSE, CHEST, TAKE, STORE, HOME, CHESTS, BLUEPRINT, TREE, SMALL_TALK }
+    public enum Local { FOLLOW, STAY, WANDER, COME, GIVE, INVENTORY, CRAFT, PVP, DIG, STRIP, COLLECT, FARM, ORE, WOOD, MINE, PLAY, STOP, HOUSE, CHEST, TAKE, STORE, HOME, CHESTS, BLUEPRINT, TREE, RECIPE, MAKE, SMALL_TALK }
 
     private static final Pattern FOLLOW = Pattern.compile("\\b(follow me|come with me|let'?s go|stick with me|tag along)\\b");
     private static final Pattern STAY = Pattern.compile("\\b(stay here|stay there|stay put|wait here|wait there|stop following|don'?t move|stop moving)\\b");
@@ -94,6 +94,7 @@ public final class HumanChatListener {
             if (Storage.CHEST_HERE.matcher(m).find()) return Local.CHEST;
             if (Storage.parseTake(m) != null) return Local.TAKE;
             if (Woods.isQuestion(m)) return Local.TREE;
+            if (RecipeBook.howTo(m) != null && RecipeBook.itemFor(RecipeBook.howTo(m)) != null) return Local.RECIPE;
             if (Blueprints.parse(m, null, null) != null) return Local.BLUEPRINT;
             if (House.request(m, null) != null) return Local.HOUSE;
             if (Storage.STORE.matcher(m).find()) return Local.STORE;
@@ -107,6 +108,7 @@ public final class HumanChatListener {
             if (Farm.request(m) != null) return Local.FARM;
             if (MiningSkills.parseStrip(m) != null) return Local.STRIP;
             if (MiningSkills.parseCollect(m) != null) return Local.COLLECT;
+            if (BlueprintBuilder.parseCraft(m) != null) return Local.MAKE;
             if (CRAFT.matcher(m).find()) return Local.CRAFT;
             if (ORE.matcher(m).find()) return Local.ORE;
             if (WOOD.matcher(m).find()) return Local.WOOD;
@@ -264,6 +266,16 @@ public final class HumanChatListener {
                             "on it, just getting everything ready first"));
                     return;
                 }
+                SurvivalBrain.startJob(bot, req.label(), true, req.job());
+                HumanChat.say(server, botName, req.ack());
+            }
+            case RECIPE -> {
+                String a = RecipeBook.answer(RecipeBook.howTo(HumanReactions.normalise(text, botName)));
+                HumanChat.say(server, botName, a != null ? a : "hm, don't remember that one");
+            }
+            case MAKE -> {
+                MiningSkills.Request req = BlueprintBuilder.craftRequest(HumanReactions.normalise(text, botName), sender.getUUID());
+                if (req == null) return;
                 SurvivalBrain.startJob(bot, req.label(), true, req.job());
                 HumanChat.say(server, botName, req.ack());
             }

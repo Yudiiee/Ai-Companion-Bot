@@ -75,6 +75,14 @@ public final class HumanPersona {
                 sb.append("\nRECENT CHAT (oldest first; lines from <").append(botName).append("> are yours):\n")
                   .append(chat).append('\n');
             }
+            // recipes for what's being talked about, from the recipe book every companion remembers
+            try {
+                java.util.List<RecipeBook.Recipe> rs = RecipeBook.mentioned(ConversationMemory.transcript(4), 6);
+                if (!rs.isEmpty()) {
+                    sb.append("\nRECIPES YOU REMEMBER (exact; use these if asked how to make something):\n");
+                    for (RecipeBook.Recipe r : rs) sb.append("- ").append(r.explain()).append('\n');
+                }
+            } catch (Exception ignored) { }
         }
         return sb.toString();
     }

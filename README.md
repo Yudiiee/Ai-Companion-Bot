@@ -33,6 +33,8 @@ on their own out of the box, and you can hook them up to an LLM for real convers
 - **Knows its trees.** Spruce is spruce and dark oak is dark oak: it chops the right trees for a build, knows
   where each grows and what colour it comes out, and when a wood can't be had it picks the closest-looking one
   and tells you.
+- **Remembers its recipes.** Every companion knows the recipes in `config/ai-companion/recipes.txt` (171 to start,
+  add your own): ask "how do i make a hopper", or "craft me 2 hoppers" and it makes them from scratch.
 - **Builds from schematics.** Drop WorldEdit `.schem`, structure-block `.nbt` or Litematica `.litematic` files in
   `config/ai-companion/schematics` and say `build the iron farm`. It gathers what it can, builds it in the right
   order with pistons, observers and redstone pointing the right way, crafting the stairs, slabs, trapdoors, stone
@@ -68,6 +70,7 @@ The full list of what the companions do is in [FEATURES.md](FEATURES.md).
    - `get me 10 iron`, `mine diamonds`, `dig down`, `strip mine for gold`
    - `build a farm`, `harvest the crops`
    - `what can you build`, `build a cactus farm`, `build the iron farm here`, `continue the build`
+   - `how do i make a crafter`, `craft me 2 lanterns`, `what kind of tree is that`
    - `follow me`, `stay here`, `come here`, `stop`
 
 It plays on its own when you leave it be. `/humanlike` shows the settings (chat, autoplay, home,

@@ -174,6 +174,18 @@ and makes each companion feel like another person playing with you.
 - Eating: when food is 14 or lower, or when it's hurt and not full (so health comes back).
 - Saved per bot, per world (`<world>/ai-companion/farms.txt`). Seeds aren't thrown out as junk once there's a farm.
 
+**Recipe book**
+- Every companion remembers the recipes in `config/ai-companion/recipes.txt` (171 to start with: 26.3's poplar
+  wood and straw bed, wool stairs, slabs and cushions, workstations, redstone, tools, armour, netherite smithing,
+  smelting, blasting and smoking, rails and minecarts, food, end-game items). One per line,
+  `RECIPE | ID: ... | TYPE: ... | WORKSTATION: ... | INPUTS: [...] | OUTPUT: 4x minecraft:...`; add your own and
+  they're picked up within seconds. It understands grids, `item*3`, `2x2:item`, `1,1,1:item`, `ring:`, `cross:`,
+  `... around ...`, `ring:x with center:y`, and the tags `#planks`, `#logs`, `#wooden_slabs`, `#stone_crafting`.
+- "how do i make a hopper" / "what's the recipe for a crafter": what goes in, where it's made and the layout.
+- "craft me 2 hoppers", "make me an iron pickaxe": it makes it from scratch (gathers, smelts and crafts every part,
+  makes a smithing table for smithing) and hands it over, or tells you what it couldn't get.
+- Builds use the same recipes, and the language model gets the exact recipes for whatever the chat mentions.
+
 **Starter houses** (six medieval designs)
 - Each companion builds its own house from the starter designs (side file `starter: yes`): the first bot the
   medieval cottage, the next the townhouse, then the inn, workshop, hall and manor (from a village by ajmed).
@@ -327,4 +339,4 @@ It hooks into: `AICompanion` (registration, hit reaction), `AICompanionClient` (
 `ItemHandoffHandler` (casual lines), `LLMServiceHandler` / `RAG2` / `PromptBuilder` (persona prompt),
 `NearbyBedSleepController` (reads the bed rule through the environment attribute system).
 
-Build: `./gradlew build` → `build/libs/ai-companion-1.3.0+26.3.jar`.
+Build: `./gradlew build` → `build/libs/ai-companion-1.4.0+26.3.jar`.

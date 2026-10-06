@@ -1,5 +1,15 @@
 # AI Companion - Changelog
 
+## 1.4.0 (Minecraft 26.3)
+
+- A recipe book every companion remembers: 171 recipes (26.3 additions like poplar wood and the straw bed, wool
+  stairs/slabs/cushions, workstations, redstone, tools and armour, netherite smithing, smelting/blasting/smoking,
+  rails, food and end-game items). It's in `config/ai-companion/recipes.txt`, one recipe per line; add your own.
+- "how do i make a hopper" / "what's the recipe for X": it explains the recipe (what goes in, where, the layout).
+- "craft me 2 hoppers": it makes anything in the book from scratch (gathering, smelting and crafting the parts,
+  a smithing table for smithing) and brings it over, or says what it's missing.
+- Builds use the book too, and the language model is told the recipes for anything the chat is about.
+
 ## 1.3.0 (Minecraft 26.3)
 
 - Starter houses: every companion builds one of six medieval houses (from a village by ajmed) as its home. The
