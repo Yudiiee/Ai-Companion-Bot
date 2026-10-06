@@ -11,5 +11,8 @@ storage, mining staircase and strip mining, food farm, building from schematics,
 and survival reflexes)
 and a port to Minecraft 26.3.
 
+The bundled iron farm design (src/main/resources/assets/ai-companion/schematics/iron_farm.nbt) is by
+F3deMatt25.
+
 The language models used by the chat intent system are downloaded at first launch
 from the original AI-Player release assets.

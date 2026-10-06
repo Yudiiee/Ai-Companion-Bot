@@ -176,14 +176,20 @@ and makes each companion feel like another person playing with you.
 
 **Building from schematics** (farms and anything else)
 - Every `.schem` (WorldEdit, Sponge v1-3), structure-block `.nbt` and `.litematic` in
-  `config/ai-companion/schematics` is something the companions can build. Three starter designs come with the mod:
-  a sugar cane farm, a cactus farm and a bamboo farm (deleting one keeps it gone).
+  `config/ai-companion/schematics` is something the companions can build. Four designs come with the mod: a sugar
+  cane farm, a cactus farm, a bamboo farm and a villager-pod iron farm by F3deMatt25 (deleting one keeps it gone).
+  For the iron farm, bring 3 villagers to the beds at the top once it's built (the bot reminds you).
 - `build the iron farm` picks a flat, free spot beside the house with the design's front towards it (or around the
   bot when there's no house); `build it here` puts it two blocks in front of you, facing you; `build it at x y z`
   (optionally `facing north`) puts the ground layer's corner there.
-- It works out what's missing and gets it: pockets, then the chests, then crafting (torches, chests, slabs, planks,
-  ladders...), smelting (glass, stone) and digging or cutting (dirt, sand, gravel, cobblestone, logs, sugar cane,
-  cactus, bamboo). Any planks or logs will do. What it can't get it lists, builds the rest, and finishes later.
+- It works out what's missing and gets it: pockets, then the chests, then crafting, smelting (stone, glass, iron)
+  and digging or cutting (dirt, sand, gravel, cobblestone, coal, logs, sugar cane, cactus, bamboo). It knows the
+  recipes for the usual building blocks: planks, stripped logs, wooden stairs, slabs, fences, gates, trapdoors,
+  doors, signs, buttons and pressure plates, stone bricks and their slabs, stairs, walls and chiseled bricks, glass
+  panes, chests, ladders, torches, lanterns, chains, hoppers, campfires, and redstone parts (torches, repeaters,
+  comparators, pistons, observers, droppers, levers). Any kind of wood will do for a wooden block. What it can't
+  get (beds, wool, banners, nether blocks...) it lists, builds the rest, and finishes later.
+- `note:` in the side file is said when the build is finished (the iron farm uses it for the villagers).
 - It clears the area top down, then places the solid parts bottom up, then water and lava (filling a bucket at the
   nearest water, or at its own farm once that refills by itself), then torches, redstone, rails and plants. Plain
   blocks go in with a right-click; anything that points a certain way (pistons, observers, hoppers, stairs,
@@ -299,4 +305,4 @@ It hooks into: `AICompanion` (registration, hit reaction), `AICompanionClient` (
 `ItemHandoffHandler` (casual lines), `LLMServiceHandler` / `RAG2` / `PromptBuilder` (persona prompt),
 `NearbyBedSleepController` (reads the bed rule through the environment attribute system).
 
-Build: `./gradlew build` → `build/libs/ai-companion-1.1.0+26.3.jar`.
+Build: `./gradlew build` → `build/libs/ai-companion-1.2.0+26.3.jar`.

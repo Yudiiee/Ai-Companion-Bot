@@ -30,8 +30,9 @@ on their own out of the box, and you can hook them up to an LLM for real convers
   wheat, then beetroot). It harvests, replants, bakes bread and keeps enough food on hand.
 - **Builds from schematics.** Drop WorldEdit `.schem`, structure-block `.nbt` or Litematica `.litematic` files in
   `config/ai-companion/schematics` and say `build the iron farm`. It gathers what it can, builds it in the right
-  order with pistons, observers and redstone pointing the right way, and tells you what's still missing. Comes with
-  a sugar cane farm, a cactus farm and a bamboo farm, and keeps the farms it builds harvested.
+  order with pistons, observers and redstone pointing the right way, crafting the stairs, slabs, trapdoors, stone
+  bricks and hoppers it needs, and tells you what's still missing. Comes with a sugar cane farm, a cactus farm, a
+  bamboo farm and an iron farm, and keeps the farms it builds harvested.
 - **Fights smart.** It goes after creepers (hit and back off) and skeletons (shield up, close in)
   on sight, and fights any other mob once it's attacked. Below 7 health it blocks the mob off
   and retreats to heal.

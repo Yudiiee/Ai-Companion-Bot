@@ -401,10 +401,14 @@ final class BlueprintBuilder {
     // Materials
     // ------------------------------------------------------------------------
 
-    /** Any planks will do for planks, any log for a log (it's still the same shape). */
+    /** Any wood will do for a wooden thing (oak stairs for spruce stairs: same shape), coal or charcoal. */
     static Predicate<String> itemTest(String item) {
-        if (item.endsWith("_planks")) return p -> p.endsWith("_planks");
-        if (item.endsWith("_log") && !item.startsWith("stripped_")) return p -> p.endsWith("_log") && !p.startsWith("stripped_");
+        String[] w = Rules.wood(item);
+        if (w != null) return p -> {
+            String[] x = Rules.wood(p);
+            return x != null && x[1].equals(w[1]);
+        };
+        if (item.equals("coal")) return p -> p.equals("coal") || p.equals("charcoal");
         return item::equals;
     }
 
@@ -425,46 +429,217 @@ final class BlueprintBuilder {
     }
 
     private static String poolKey(String item) {
-        if (item.endsWith("_planks")) return "oak_planks";
-        if (item.endsWith("_log") && !item.startsWith("stripped_")) return "oak_log";
-        return item;
+        String[] w = Rules.wood(item);
+        return w == null ? item : Rules.woodPath("oak", w[1]);
     }
 
     static String label(String item) {
-        return switch (item) {
-            case "oak_planks" -> "planks";
-            case "oak_log" -> "logs";
-            default -> item.replace('_', ' ');
-        };
+        String[] w = Rules.wood(item);
+        if (w != null && w[0].equals("oak")) {
+            return switch (w[1]) {
+                case "planks" -> "planks";
+                case "log" -> "logs";
+                case "stripped_log" -> "stripped logs";
+                default -> "wooden " + w[1].replace('_', ' ') + "s";
+            };
+        }
+        return item.replace('_', ' ');
     }
 
-    /** What the bot knows how to make itself. */
-    private static Gathering.Craftable craftableFor(String item) {
-        return switch (item) {
-            case "torch" -> Gathering.craftable("torches");
-            case "chest" -> Gathering.craftable("chest");
-            case "crafting_table" -> Gathering.craftable("crafting table");
-            case "furnace" -> Gathering.craftable("furnace");
-            case "ladder" -> Gathering.craftable("ladders");
-            case "oak_slab" -> Gathering.craftable("slabs");
-            case "oak_door" -> Gathering.craftable("door");
-            case "stick" -> Gathering.craftable("sticks");
-            case "oak_planks" -> Gathering.craftable("planks");
+    // ------------------------------------------------------------------------
+    // Recipes for building blocks (crafted from the inventory, like Gathering does)
+    // ------------------------------------------------------------------------
+
+    /** {@code out} of {@code item} from {@code in} (item, count pairs). {@code table}: needs a crafting table. */
+    record Recipe(String item, int out, Map<String, Integer> in, boolean table, String tool) {}
+
+    private static Map<String, Integer> in(Object... kv) {
+        Map<String, Integer> m = new LinkedHashMap<>();
+        for (int i = 0; i < kv.length; i += 2) m.put((String) kv[i], (Integer) kv[i + 1]);
+        return m;
+    }
+
+    private static final Map<String, Recipe> RECIPES = new HashMap<>();
+
+    private static void r(String item, int out, boolean table, Object... kv) {
+        RECIPES.put(item, new Recipe(item, out, in(kv), table, null));
+    }
+
+    static {
+        r("stick", 4, false, "oak_planks", 2);
+        r("crafting_table", 1, false, "oak_planks", 4);
+        r("chest", 1, true, "oak_planks", 8);
+        r("barrel", 1, true, "oak_planks", 6, "oak_slab", 2);
+        r("ladder", 3, true, "stick", 7);
+        r("torch", 4, false, "coal", 1, "stick", 1);
+        r("stone_bricks", 4, false, "stone", 4);
+        r("stone_brick_slab", 6, true, "stone_bricks", 3);
+        r("stone_brick_stairs", 4, true, "stone_bricks", 6);
+        r("stone_brick_wall", 6, true, "stone_bricks", 6);
+        r("chiseled_stone_bricks", 1, false, "stone_brick_slab", 2);
+        r("stone_slab", 6, true, "stone", 3);
+        r("stone_stairs", 4, true, "stone", 6);
+        r("stone_pressure_plate", 1, false, "stone", 2);
+        r("stone_button", 1, false, "stone", 1);
+        r("cobblestone_slab", 6, true, "cobblestone", 3);
+        r("cobblestone_stairs", 4, true, "cobblestone", 6);
+        r("cobblestone_wall", 6, true, "cobblestone", 6);
+        r("furnace", 1, true, "cobblestone", 8);
+        r("glass_pane", 16, true, "glass", 6);
+        r("iron_nugget", 9, false, "iron_ingot", 1);
+        r("iron_chain", 1, true, "iron_ingot", 1, "iron_nugget", 2);
+        r("lantern", 1, true, "iron_nugget", 8, "torch", 1);
+        r("hopper", 1, true, "iron_ingot", 5, "chest", 1);
+        r("bucket", 1, true, "iron_ingot", 3);
+        r("iron_bars", 16, true, "iron_ingot", 6);
+        r("rail", 16, true, "iron_ingot", 6, "stick", 1);
+        r("campfire", 1, true, "stick", 3, "coal", 1, "oak_log", 3);
+        r("redstone_torch", 1, false, "stick", 1, "redstone", 1);
+        r("lever", 1, false, "stick", 1, "cobblestone", 1);
+        r("repeater", 1, true, "redstone_torch", 2, "redstone", 1, "stone", 3);
+        r("comparator", 1, true, "redstone_torch", 3, "quartz", 1, "stone", 3);
+        r("piston", 1, true, "oak_planks", 3, "cobblestone", 4, "iron_ingot", 1, "redstone", 1);
+        r("sticky_piston", 1, false, "piston", 1, "slime_ball", 1);
+        r("observer", 1, true, "cobblestone", 6, "redstone", 2, "quartz", 1);
+        r("dropper", 1, true, "cobblestone", 7, "redstone", 1);
+        r("dispenser", 1, true, "cobblestone", 7, "redstone", 1, "bow", 1);
+        r("redstone_lamp", 1, true, "redstone", 4, "glowstone", 1);
+        r("note_block", 1, true, "oak_planks", 8, "redstone", 1);
+        r("composter", 1, true, "oak_slab", 7);
+        r("white_bed", 1, true, "white_wool", 3, "oak_planks", 3);
+    }
+
+    /** The recipe for an item, wooden things worked out for any kind of wood. */
+    static Recipe recipeFor(String item) {
+        Recipe r = RECIPES.get(item);
+        if (r != null) return r;
+        String[] w = Rules.wood(item);
+        if (w == null) return null;
+        String sp = w[0], planks = Rules.woodPath(sp, "planks"), log = Rules.woodPath(sp, "log");
+        return switch (w[1]) {
+            case "planks" -> new Recipe(item, sp.equals("bamboo") ? 2 : 4, in(log, 1), false, null);
+            case "wood" -> new Recipe(item, 3, in(log, 4), false, null);
+            case "stripped_log" -> new Recipe(item, 1, in(log, 1), false, "_axe"); // an axe on a log
+            case "stripped_wood" -> new Recipe(item, 1, in(Rules.woodPath(sp, "wood"), 1), false, "_axe");
+            case "stairs" -> new Recipe(item, 4, in(planks, 6), true, null);
+            case "slab" -> new Recipe(item, 6, in(planks, 3), true, null);
+            case "fence" -> new Recipe(item, 3, in(planks, 4, "stick", 2), true, null);
+            case "fence_gate" -> new Recipe(item, 1, in(planks, 2, "stick", 4), true, null);
+            case "trapdoor" -> new Recipe(item, 2, in(planks, 6), true, null);
+            case "door" -> new Recipe(item, 3, in(planks, 6), true, null);
+            case "pressure_plate" -> new Recipe(item, 1, in(planks, 2), false, null);
+            case "button" -> new Recipe(item, 1, in(planks, 1), false, null);
+            case "sign" -> new Recipe(item, 3, in(planks, 6, "stick", 1), true, null);
             default -> null;
         };
     }
 
+    /** Can it get this one way or another (recipe, furnace, digging)? */
+    static boolean obtainable(String item, int depth) {
+        if (depth > 6) return false;
+        if (gatherTarget(item) != null || SMELTED.containsKey(item)) return true;
+        Recipe r = recipeFor(item);
+        if (r == null) return false;
+        for (String i : r.in().keySet()) if (!obtainable(i, depth + 1)) return false;
+        return true;
+    }
+
+    /** Furnace outputs it can make: output -> Smelting phrase. */
+    private static final Map<String, String> SMELTED = Map.of("stone", "stone", "glass", "glass", "iron_ingot", "iron",
+            "gold_ingot", "gold", "copper_ingot", "copper", "charcoal", "wood");
+
+    /**
+     * Gets {@code want} of {@code item} into the pockets: chests first, then the recipe (making
+     * its ingredients the same way), the furnace, or digging. True if it has them. Job thread.
+     */
+    static boolean make(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, String item, int want, int depth,
+                        Predicate<String> keep) throws InterruptedException {
+        Predicate<String> test = itemTest(item);
+        int have = onServer(server, () -> Gathering.countOf(bot, test), 0);
+        if (have >= want) return true;
+        if (depth > 6 || !SurvivalBrain.canContinue(b)) return false;
+        have += Storage.withdraw(server, bot, b, test, want - have, depth == 0 ? label(item) : null);
+        if (have >= want) return true;
+        Recipe r = recipeFor(item);
+        try {
+            if (r == null) {
+                String phrase = SMELTED.get(item);
+                if (phrase != null) {
+                    Smelting.Recipe sr = Smelting.recipeFor(phrase);
+                    if (sr != null) Smelting.smeltFor(server, bot, b, sr, want - have, null);
+                } else {
+                    MiningSkills.Target t = gatherTarget(item);
+                    if (t == null) return false;
+                    if (depth == 0 || want - have >= 4) {
+                        SurvivalBrain.maybeSay(server, b, HumanChat.pick("need " + (want - have) + " " + label(item) + ", gonna go get some",
+                                "getting " + label(item) + " for the build"), 0.8);
+                    }
+                    MiningSkills.collect(server, bot, b, t, want - have, true);
+                    // a kind of tree that isn't around here: any wood does
+                    String[] w = Rules.wood(item);
+                    if (w != null && w[1].equals("log") && onServer(server, () -> Gathering.countOf(bot, test), 0) < want) {
+                        MiningSkills.Target any = MiningSkills.resolve("wood");
+                        if (any != null) MiningSkills.collect(server, bot, b, any, want - onServer(server, () -> Gathering.countOf(bot, test), 0), true);
+                    }
+                }
+                return onServer(server, () -> Gathering.countOf(bot, test), 0) >= want;
+            }
+            int crafts = (want - have + r.out() - 1) / r.out();
+            if (r.tool() != null && onServer(server, () -> Building.firstItem(bot, p -> p.endsWith(r.tool())) == null, true)) {
+                Gathering.Craftable axe = Gathering.craftable("stone axe");
+                if (axe == null || !Gathering.makeSure(server, bot, b, axe, 1)) return false;
+                SurvivalBrain.keep(bot, keep);
+            }
+            if (r.table() && onServer(server, () -> Gathering.countOf(bot, "crafting_table"::equals) == 0, true)) {
+                if (!make(server, bot, b, "crafting_table", 1, depth + 1, keep)) return false;
+            }
+            for (Map.Entry<String, Integer> e : r.in().entrySet()) {
+                // what the other ingredients and the table already use of the same thing isn't double counted: separate items
+                make(server, bot, b, e.getKey(), e.getValue() * crafts, depth + 1, keep);
+                if (!SurvivalBrain.canContinue(b)) return false;
+            }
+            onServer(server, () -> {
+                for (int c = 0; c < crafts; c++) {
+                    for (Map.Entry<String, Integer> e : r.in().entrySet()) {
+                        if (Gathering.countOf(bot, itemTest(e.getKey())) < e.getValue()) return null;
+                    }
+                    if (!Gathering.roomFor(bot, test, r.out())) {
+                        Storage.makeRoom(bot, 2);
+                        if (!Gathering.roomFor(bot, test, r.out())) return null;
+                    }
+                    String madeOf = null;
+                    for (Map.Entry<String, Integer> e : r.in().entrySet()) {
+                        String first = SurvivalBrain.take(bot, itemTest(e.getKey()), e.getValue());
+                        if (madeOf == null && first != null && Rules.wood(first) != null) madeOf = first;
+                    }
+                    // spruce planks make spruce stairs, oak planks oak stairs
+                    String[] out = Rules.wood(item), from = madeOf == null ? null : Rules.wood(madeOf);
+                    SurvivalBrain.give(bot, out != null && from != null ? Rules.woodPath(from[0], out[1]) : item, r.out());
+                }
+                Motions.swingArm(bot);
+                return null;
+            }, null);
+            return onServer(server, () -> Gathering.countOf(bot, test), 0) >= want;
+        } finally {
+            SurvivalBrain.keep(bot, keep); // crafting, smelting and gathering reset it
+        }
+    }
+
     private static final Set<String> DIGGABLE = Set.of("dirt", "sand", "red_sand", "gravel", "cobblestone", "cobbled_deepslate",
-            "netherrack", "soul_sand", "soul_soil", "sugar_cane", "cactus", "bamboo", "blackstone");
+            "netherrack", "soul_sand", "soul_soil", "sugar_cane", "cactus", "bamboo", "blackstone", "coal", "redstone", "quartz",
+            "raw_iron");
 
     /** Where to get it out in the world (dig, chop, cut), or null. */
     static MiningSkills.Target gatherTarget(String item) {
-        if (item.equals("oak_log")) return MiningSkills.resolve("wood");
-        if (item.endsWith("_log") && !item.startsWith("stripped_")) return MiningSkills.resolve(item.replace("_log", "").replace('_', ' '));
+        String[] w = Rules.wood(item);
+        if (w != null && w[1].equals("log") && !w[0].equals("bamboo")) {
+            return w[0].equals("oak") ? MiningSkills.resolve("wood") : MiningSkills.resolve(w[0].replace('_', ' '));
+        }
         if (!DIGGABLE.contains(item)) return null;
         return switch (item) {
             case "cobblestone" -> MiningSkills.resolve("stone");
             case "cobbled_deepslate" -> MiningSkills.resolve("deepslate");
+            case "raw_iron" -> MiningSkills.resolve("iron");
             default -> MiningSkills.resolve(item.replace('_', ' '));
         };
     }
@@ -484,25 +659,9 @@ final class BlueprintBuilder {
             String item = e.getKey();
             int n = e.getValue();
             if (n > MAX_GATHER) continue;
-            try {
-                Gathering.Craftable c = craftableFor(item);
-                if (c != null) {
-                    int have = onServer(server, () -> Gathering.countOf(bot, c.matches()), 0);
-                    Gathering.makeSure(server, bot, b, c, have + n);
-                } else if (item.equals("glass") || item.equals("stone")) {
-                    Smelting.Recipe r = Smelting.recipeFor(item.equals("glass") ? "glass" : "stone");
-                    if (r != null) Smelting.smeltFor(server, bot, b, r, n, null);
-                } else {
-                    MiningSkills.Target t = gatherTarget(item);
-                    if (t != null) {
-                        SurvivalBrain.maybeSay(server, b, HumanChat.pick("need " + n + " " + label(item) + ", gonna go get some",
-                                "getting " + label(item) + " for the build"), 0.8);
-                        MiningSkills.collect(server, bot, b, t, n, true);
-                    }
-                }
-            } finally {
-                SurvivalBrain.keep(bot, keep); // crafting and smelting reset it
-            }
+            if (!obtainable(item, 0)) continue; // say so at the end
+            int have = onServer(server, () -> Gathering.countOf(bot, itemTest(item)), 0);
+            make(server, bot, b, item, have + n, 0, keep);
         }
         return onServer(server, () -> shortfall(bot, needs), missing);
     }
@@ -554,7 +713,7 @@ final class BlueprintBuilder {
         if (still.isEmpty()) sb.append(". we've got all of it");
         else {
             List<String> self = new ArrayList<>();
-            for (String k : still.keySet()) if (craftableFor(k) != null || gatherTarget(k) != null || k.equals("glass") || k.equals("stone")) self.add(label(k));
+            for (String k : still.keySet()) if (obtainable(k, 0)) self.add(label(k));
             sb.append(". still need ").append(listOf(still, 8));
             if (!self.isEmpty()) sb.append(" (i can get the ").append(String.join(", ", self.subList(0, Math.min(4, self.size())))).append(" myself)");
         }
@@ -685,8 +844,9 @@ final class BlueprintBuilder {
         }
         if (Rules.isGravity(plan.path()) && Building.isFree(level, pos.below()) && p.contains(pos.below())) return SKIP; // would just fall
         State target = Rules.placeState(plan);
-        if (!using.isEmpty() && !using.get(0).equals(needs.get(0).item()) && needs.get(0).item().equals(target.path())) {
-            target = target.withId(using.get(0)); // other planks / logs: block id is the item id
+        if (!using.isEmpty() && !using.get(0).equals(needs.get(0).item())) {
+            String[] used = Rules.wood(using.get(0)), planned = Rules.wood(target.path());
+            if (used != null && planned != null) target = target.withId(Rules.woodPath(used[0], planned[1])); // oak for spruce
         }
         // plain cubes go in like a player places them
         if (Rules.byHand(plan) && target.path().equals(plan.path())) {
@@ -1085,7 +1245,8 @@ final class BlueprintBuilder {
                     ? " (skipped " + listOf(left.unobtainable, 3) + ", can't get those in survival)" : "";
             if (complete) {
                 HumanChat.say(server, b.name, HumanChat.pick("done! the " + e.name() + " is built", "the " + e.name() + " is finished")
-                        + skipped + (left != null && left.leftAlone > 0 ? ". left a chest or bed that was in the way" : ""));
+                        + skipped + (left != null && left.leftAlone > 0 ? ". left a chest or bed that was in the way" : "")
+                        + (e.note().isBlank() ? "" : ". " + e.note()));
                 return;
             }
             Map<String, Integer> still = left == null ? Map.of() : onServer(server, () -> shortfall(bot, left.needs), Map.of());

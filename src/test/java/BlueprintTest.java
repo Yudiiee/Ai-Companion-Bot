@@ -56,6 +56,7 @@ public class BlueprintTest {
         return p;
     }
 
+    @SuppressWarnings("unchecked")
     public static void main(String[] a) throws Exception {
         Path dir = Files.createTempDirectory("bp");
         Path starters = Paths.get(a.length > 0 ? a[0] : "src/src/main/resources/assets/ai-companion/schematics");
@@ -236,6 +237,45 @@ public class BlueprintTest {
             check(true, "junk refused: " + e.getMessage());
         }
 
+        // ---------------- wood and recipes ----------------
+        check(Arrays.equals(Rules.wood("spruce_stairs"), new String[]{"spruce", "stairs"}) && Arrays.equals(Rules.wood("dark_oak_planks"), new String[]{"dark_oak", "planks"})
+                && Arrays.equals(Rules.wood("stripped_crimson_stem"), new String[]{"crimson", "stripped_log"}) && Rules.wood("oak_leaves") == null
+                && Rules.wood("stone_bricks") == null && Arrays.equals(Rules.wood("spruce_wall_sign"), new String[]{"spruce", "wall_sign"}), "wood names");
+        check(Rules.woodPath("warped", "log").equals("warped_stem") && Rules.woodPath("oak", "stripped_log").equals("stripped_oak_log")
+                && Rules.woodPath("birch", "fence_gate").equals("birch_fence_gate"), "wood ids");
+        check(Rules.matches(State.parse("spruce_trapdoor[facing=east,half=top,open=false]"), State.parse("oak_trapdoor[facing=east,half=top,open=false,powered=false]"))
+                && !Rules.matches(State.parse("spruce_trapdoor"), State.parse("spruce_door")), "any wood, same shape");
+        Class<?> bbc = Class.forName("io.github.yudiiee.aicompanion.GameAI.human.BlueprintBuilder");
+        Method recipeFor = bbc.getDeclaredMethod("recipeFor", String.class);
+        recipeFor.setAccessible(true);
+        Object rs = recipeFor.invoke(null, "spruce_stairs");
+        check(rs != null && rs.toString().contains("spruce_planks=6") && rs.toString().contains("out=4"), "stairs recipe: " + rs);
+        Object rstrip = recipeFor.invoke(null, "stripped_spruce_log");
+        check(rstrip != null && rstrip.toString().contains("spruce_log=1") && rstrip.toString().contains("_axe"), "stripped log takes an axe");
+        check(recipeFor.invoke(null, "chiseled_stone_bricks").toString().contains("stone_brick_slab=2"), "chiseled from slabs");
+        Method obtainable = bbc.getDeclaredMethod("obtainable", String.class, int.class);
+        obtainable.setAccessible(true);
+        for (String it : new String[]{"stone_brick_slab", "spruce_fence_gate", "lantern", "hopper", "glass_pane", "campfire", "chest", "spruce_sign"})
+            check((boolean) obtainable.invoke(null, it, 0), it + " can be made");
+        for (String it : new String[]{"yellow_bed", "moss_carpet", "decorated_pot", "purple_banner"})
+            check(!(boolean) obtainable.invoke(null, it, 0), it + " has to be brought");
+
+        // the bundled iron farm
+        Schematic iron = Schematic.load(starters.resolve("iron_farm.nbt"));
+        check(iron.sx == 25 && iron.sy == 24 && iron.sz == 11 && iron.solidCount() == 1861, "iron farm loads: " + iron.sx + "x" + iron.sy + "x" + iron.sz);
+        int soil = 0, above = 0;
+        for (int x = 0; x < 25; x++) for (int z = 0; z < 11; z++) {
+            State g = iron.at(x, 4, z), u = iron.at(x, 5, z);
+            if (g != null && (g.path().equals("dirt") || g.path().equals("grass_block"))) soil++;
+            if (u != null && (u.path().equals("dirt") || u.path().equals("grass_block"))) above++;
+        }
+        check(soil > 200 && above == 0, "iron farm layer 4 is the ground (" + soil + " soil blocks)");
+        Map<String, Integer> ib = (Map<String, Integer>) bill.invoke(null, iron);
+        List<String> bring = new ArrayList<>();
+        for (String k : ib.keySet()) if (!(boolean) obtainable.invoke(null, k, 0)) bring.add(k);
+        System.out.println("  iron farm, has to be brought: " + bring);
+        check(ib.get("yellow_bed") == 3 && !ib.containsKey("water"), "beds counted once each, water isn't an item");
+
         // ---------------- names ----------------
         List<Blueprints.Entry> entries = List.of(
                 entry("sugar cane farm", "cane farm", "sugarcane farm"),
@@ -249,8 +289,8 @@ public class BlueprintTest {
         check(Blueprints.find("farm", entries) == null, "just 'farm' is too vague");
         check(Blueprints.find("house", entries) == null, "house isn't a design here");
         check(Blueprints.find("stone pickaxe", entries) == null, "tools aren't designs");
-        Blueprints.Match iron = Blueprints.find("iron", entries);
-        check(iron != null && iron.entry() == null && iron.options().size() == 2, "'iron' is ambiguous between two designs");
+        Blueprints.Match ironMatch = Blueprints.find("iron", entries);
+        check(ironMatch != null && ironMatch.entry() == null && ironMatch.options().size() == 2, "'iron' is ambiguous between two designs");
         check(name(Blueprints.find("iron farm", entries)).equals("iron farm"), "exact beats partial");
 
         // ---------------- chat routing ----------------
@@ -297,7 +337,7 @@ public class BlueprintTest {
     }
 
     static Blueprints.Entry entry(String name, String... aliases) {
-        return new Blueprints.Entry(name, Paths.get(name.replace(' ', '_') + ".nbt"), List.of(aliases), "", 0, "south");
+        return new Blueprints.Entry(name, Paths.get(name.replace(" ", "_") + ".nbt"), List.of(aliases), "", 0, "south", "");
     }
 
     static int[] invoke(String m, int x, int z, int sx, int sz, int t) throws Exception {

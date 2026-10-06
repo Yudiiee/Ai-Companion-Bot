@@ -41,12 +41,12 @@ public final class Blueprints {
 
     static final String[] EXTENSIONS = {".schem", ".schematic", ".nbt", ".litematic"};
     /** Designs that ship with the mod (put in the folder the first time, never again if deleted). */
-    static final String[] STARTERS = {"sugar_cane_farm", "cactus_farm", "bamboo_farm"};
+    static final String[] STARTERS = {"sugar_cane_farm", "cactus_farm", "bamboo_farm", "iron_farm"};
 
     private Blueprints() {}
 
     /** A design in the folder. {@code ground}: which layer is level with the ground. {@code front}: north/east/south/west. */
-    public record Entry(String name, Path file, List<String> aliases, String about, int ground, String front) {
+    public record Entry(String name, Path file, List<String> aliases, String about, int ground, String front, String note) {
         String fileName() { return file.getFileName().toString(); }
     }
 
@@ -132,6 +132,7 @@ public final class Blueprints {
         String about = "";
         int ground = 0;
         String front = "south";
+        String note = "";
         if (Files.isRegularFile(side)) {
             try {
                 for (String line : Files.readAllLines(side, StandardCharsets.UTF_8)) {
@@ -144,6 +145,7 @@ public final class Blueprints {
                             for (String a : v.split("[,;]")) if (!a.isBlank()) aliases.add(a.trim().toLowerCase(Locale.ROOT));
                         }
                         case "about", "description" -> about = v;
+                        case "note", "when done", "after" -> note = v;
                         case "ground" -> {
                             try { ground = Math.max(0, Integer.parseInt(v)); } catch (NumberFormatException ignored) { }
                         }
@@ -156,7 +158,7 @@ public final class Blueprints {
                 }
             } catch (IOException ignored) { }
         }
-        return new Entry(name, file, List.copyOf(aliases), about, ground, front);
+        return new Entry(name, file, List.copyOf(aliases), about, ground, front, note);
     }
 
     private static final Map<Path, SoftReference<Object[]>> PLANS = new ConcurrentHashMap<>();

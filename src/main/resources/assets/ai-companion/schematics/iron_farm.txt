@@ -1,0 +1,6 @@
+name: iron farm
+aliases: iron golem farm, golem farm, starter iron farm, villager iron farm
+about: Villager-pod iron farm by F3deMatt25 (25x24x11). Iron drops into the chests under the floor; the hatch and ladder are on the east side.
+ground: 4
+front: east
+note: bring 3 villagers up to the beds at the top and it'll start making iron

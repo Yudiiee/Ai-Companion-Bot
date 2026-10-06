@@ -515,9 +515,9 @@ public final class Schematic {
                 default:
                     break;
             }
-            // any planks for planks, any log for a log (the bot uses what it has)
-            if (planned.endsWith("_planks") && world.endsWith("_planks")) return true;
-            if (isLogLike(planned) && isLogLike(world) && planned.endsWith("_wood") == world.endsWith("_wood")) return true;
+            // any wood will do: oak stairs for spruce stairs (the bot uses what it has)
+            String[] wa = wood(planned), wb = wood(world);
+            if (wa != null && wb != null && wa[1].equals(wb[1])) return true;
             // things that change by themselves: farmland dries out, powder sets next to water
             if (planned.equals("farmland") && world.equals("dirt")) return true;
             if (planned.endsWith("_concrete_powder") && world.equals(planned.replace("_powder", ""))) return true;
@@ -529,8 +529,45 @@ public final class Schematic {
             return planned.contains("copper") && strip.equals(world.replaceFirst("^(waxed_)?(exposed_|weathered_|oxidized_)?", ""));
         }
 
-        private static boolean isLogLike(String p) {
-            return !p.startsWith("stripped_") && (p.endsWith("_log") || p.endsWith("_wood")) && !p.equals("petrified_oak_wood");
+        private static final String[] SPECIES = {"dark_oak", "pale_oak", "oak", "spruce", "birch", "jungle", "acacia",
+                "mangrove", "cherry", "crimson", "warped", "bamboo"};
+        private static final java.util.Set<String> WOOD_KINDS = java.util.Set.of("planks", "log", "wood", "stairs", "slab",
+                "fence", "fence_gate", "trapdoor", "door", "pressure_plate", "button", "sign", "wall_sign", "hanging_sign",
+                "wall_hanging_sign", "stripped_log", "stripped_wood");
+
+        /**
+         * {species, kind} for anything made of one kind of wood ("spruce_stairs" -> {spruce, stairs},
+         * "stripped_crimson_stem" -> {crimson, stripped_log}), else null.
+         */
+        public static String[] wood(String path) {
+            boolean stripped = path.startsWith("stripped_");
+            String p = stripped ? path.substring(9) : path;
+            for (String sp : SPECIES) {
+                if (!p.startsWith(sp + "_")) continue;
+                String kind = p.substring(sp.length() + 1);
+                kind = switch (kind) {
+                    case "stem" -> "log";
+                    case "hyphae" -> "wood";
+                    case "block" -> sp.equals("bamboo") ? "log" : kind;
+                    default -> kind;
+                };
+                if (sp.equals("bamboo") && kind.equals("wood")) return null;
+                if (stripped) {
+                    if (!kind.equals("log") && !kind.equals("wood")) return null;
+                    kind = "stripped_" + kind;
+                }
+                return WOOD_KINDS.contains(kind) ? new String[]{sp, kind} : null;
+            }
+            return null;
+        }
+
+        /** The id of {@code kind} in {@code species} ({@code crimson, log} -> "crimson_stem"). */
+        public static String woodPath(String species, String kind) {
+            boolean nether = species.equals("crimson") || species.equals("warped");
+            if (kind.startsWith("stripped_")) return "stripped_" + woodPath(species, kind.substring(9));
+            if (kind.equals("log")) return species.equals("bamboo") ? "bamboo_block" : species + (nether ? "_stem" : "_log");
+            if (kind.equals("wood")) return species + (nether ? "_hyphae" : "_wood");
+            return species + "_" + kind;
         }
 
         /** Plain cubes that go in with a normal right-click (the bot places those itself, like a player). */

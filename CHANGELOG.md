@@ -1,5 +1,14 @@
 # AI Companion - Changelog
 
+## 1.2.0 (Minecraft 26.3)
+
+- New bundled design: a villager-pod iron farm (by F3deMatt25). "build the iron farm"; bring 3 villagers to the
+  beds at the top when it's done.
+- The builder crafts building blocks itself: wooden stairs, slabs, fences, gates, trapdoors, doors, signs, stripped
+  logs, stone bricks and their slabs/stairs/walls, glass panes, lanterns, chains, hoppers, campfires and redstone
+  parts, making the ingredients (planks, sticks, stone, iron, nuggets) as it goes. Any kind of wood counts.
+- A design's side file can have a `note:` that the bot says when the build is done.
+
 ## 1.1.0 (Minecraft 26.3)
 
 - New: building from schematics. Drop `.schem`, `.nbt` or `.litematic` files in `config/ai-companion/schematics` and
