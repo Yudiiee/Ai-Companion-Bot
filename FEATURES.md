@@ -237,6 +237,57 @@ and makes each companion feel like another person playing with you.
   and `front:` (north/east/south/west, default south).
 - Builds are saved per world (`<world>/ai-companion/builds.txt`); finished ones aren't mined or tunnelled through.
 
+**Prices and money** (diamonds)
+- Every companion remembers the price list that ships with the mod (273 items in ten sections: 26.3 additions, wood,
+  stone and terrain, ores and metals, workstations, redstone, mob drops, food, tools and armour, smithing templates
+  and trophies). Your own prices go in `config/ai-companion/prices.txt`, one per line in the same format
+  (`PRICE | ID: minecraft:bread | RATIO: 16 = 1 DIA | UNIT_DIA: 0.0625 | RARITY: T3_REFINED | CAT: food`); a line there
+  wins over the mod's for that item, and changes are picked up within seconds. Anything not listed is worth
+  its ingredients (from the builder's recipes and the recipe book) plus 10%.
+- "how much is a hopper", "what are diamonds worth", "price of an elytra", "how much for 64 cobblestone".
+- "sell me 16 bread" / "can i buy a stack of iron" / "i want to buy 3 ender pearls": it quotes the list price
+  (from its pockets and its shop's stock); say "deal" (or "no") within two minutes. It fetches the goods from its
+  shop if need be, comes over, takes the diamonds from you and hands the goods over.
+- "buy my 64 cobblestone" / "do you want to buy my iron" / "i want to sell 10 gold": it offers 80% of the list price,
+  and on "deal" takes the items (the real stacks, enchantments and all) and pays. It won't buy used gear or shulker
+  boxes. A quote is for the player who asked; anyone else's "ok" goes on as normal chat.
+- Only whole diamonds change hands; the fractions go on your tab (any companion honours it): "what's my tab",
+  "cash out" pays out the whole diamonds. "what do you sell" lists its stock and prices; "how many diamonds do you
+  have".
+- The companions keep their diamonds on them as their wallet (`/humanlike economy off` turns all of this off).
+- The language model gets the exact price of anything the chat mentions.
+
+**The town** (built together)
+- When every companion has a finished house (and they've been around for 20 minutes), one of them proposes a town,
+  picks a dry, flattish spot clear of everyone's builds near their homes, names it and lays it out; the others
+  chime in with what they'll do. Or tell them: "let's build a city", "build a town here", "build a city called
+  Stonehaven". `/humanlike city off` stops them doing it by themselves.
+- The layout: a 15x15 plaza with a fountain in the middle, four avenues (5 wide, stone brick edges, cobblestone,
+  street lamps every 8 blocks, following the ground a block at a time, bridging water), a warehouse, a shop for
+  each companion (at least three), three community farms, a temple at the end of the north avenue, a mall at the
+  end of the east one, an amphitheatre at the end of the south one, and four town houses. Every building faces the
+  road. It goes up in that order, each road reaching a building before the building does.
+- Each companion takes the next piece nobody's working on (its own shop is its to build) and builds it like any
+  design. What it can't get, it asks the others for in chat ("Ovi, J1mbers: anyone got 96 stone bricks? need it for
+  the temple"); a free companion takes the request, gets or makes it and hands it over or leaves it in the
+  warehouse. The warehouse's chests are shared storage once it's built.
+- The town's farms are tended by whoever's around (one at a time). A farm counts as built once all that's left is
+  planting; it gets seeds by pulling up grass.
+- The temple has an offering chest on the altar. Once a day every companion takes some food (bread, wheat, apples,
+  carrots, cooked meat...) up to it, keeping enough to eat. "go make an offering" sends one now.
+- Shops: every 12 minutes or so a companion puts its loot on its shelves (ores, ingots, food, mob drops, gear it
+  doesn't use; not the building blocks the town needs, and never what it keeps on hand to eat), puts any overflow
+  on a stall in the mall (the mall is a shared market: whichever companion sells from it keeps the takings) and takes the
+  diamonds out of the till (the barrel on the counter). A starving companion with no food, or one short of
+  something for a build, buys it off another companion's shelf (spending at most half its diamonds) and leaves the
+  diamonds in the till.
+- Chat: "how's the town going", "where's the temple / mall / your shop", "work on the town" (also gives pieces that
+  got skipped another go), "forget the town" (what's built stays; they won't start another one by themselves).
+- Saved per world: `<world>/ai-companion/city.txt` (the plan and how far along it is), `economy.txt` (tabs, takings).
+  The designs are `city_plaza`, `city_temple`, `city_amphitheatre`, `city_shop`, `city_mall`, `city_farm` and
+  `city_warehouse` in the schematics folder (made by `tools/make_city_schematics.py`; edit them and new towns use
+  your versions).
+
 **Chests / storage**
 - The chest in the house becomes the storage chest. `use this chest` (while looking at a chest or barrel) makes that
   one storage. Storage chests are remembered per world, in `<world save>/ai-companion/chests.txt`.
@@ -322,6 +373,8 @@ and makes each companion feel like another person playing with you.
 /humanlike statuslines on|off  show the raw robot status lines again
 /humanlike store on|off        put mined stuff in the storage chest automatically
 /humanlike home on|off         build a base, keep loot there, go home at night
+/humanlike city on|off         found and build a town together by themselves
+/humanlike economy on|off      diamonds as money: trading, shops, prices
 /humanlike reload              re-read the config file
 ```
 
@@ -339,4 +392,7 @@ It hooks into: `AICompanion` (registration, hit reaction), `AICompanionClient` (
 `ItemHandoffHandler` (casual lines), `LLMServiceHandler` / `RAG2` / `PromptBuilder` (persona prompt),
 `NearbyBedSleepController` (reads the bed rule through the environment attribute system).
 
-Build: `./gradlew build` → `build/libs/ai-companion-1.4.0+26.3.jar`.
+Town and money: `PriceBook` (the price list), `Economy` (trading, tabs, shops), `CityPlan` (the layout), `City` (the
+town: founding, building it together, helping each other, the temple).
+
+Build: `./gradlew build` → `build/libs/ai-companion-1.5.0+26.3.jar`.

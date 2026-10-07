@@ -42,7 +42,8 @@ public final class Blueprints {
     static final String[] EXTENSIONS = {".schem", ".schematic", ".nbt", ".litematic"};
     /** Designs that ship with the mod (put in the folder the first time, never again if deleted). */
     static final String[] STARTERS = {"sugar_cane_farm", "cactus_farm", "bamboo_farm", "iron_farm", "medieval_house_1",
-            "medieval_house_2", "medieval_house_3", "medieval_house_4", "medieval_house_5", "medieval_house_6"};
+            "medieval_house_2", "medieval_house_3", "medieval_house_4", "medieval_house_5", "medieval_house_6",
+            "city_plaza", "city_temple", "city_amphitheatre", "city_shop", "city_mall", "city_farm", "city_warehouse"};
 
     private Blueprints() {}
 
@@ -376,8 +377,9 @@ public final class Blueprints {
      */
     static boolean protects(ServerLevel level, BlockPos p, boolean unfinished) {
         List<Build> all = builds();
-        if (all.isEmpty()) return false;
         String dim = DIMS.computeIfAbsent(level, Home::dim);
+        if (City.protectsRoad(dim, p)) return true; // the town's roads and street lamps
+        if (all.isEmpty()) return false;
         for (Build b : all) {
             if ((b.done() || unfinished) && b.dim().equals(dim) && b.inside(p, 1, 3)) return true;
         }

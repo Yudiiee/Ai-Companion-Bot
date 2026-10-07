@@ -83,6 +83,20 @@ public final class HumanPersona {
                     for (RecipeBook.Recipe r : rs) sb.append("- ").append(r.explain()).append('\n');
                 }
             } catch (Exception ignored) { }
+            // prices for what's being talked about, from the price list every companion remembers
+            try {
+                java.util.List<String> ps = PriceBook.mentioned(ConversationMemory.transcript(4), 8);
+                String money = Economy.persona(botName);
+                if (!money.isEmpty()) {
+                    sb.append("\nMONEY: ").append(money).append('\n');
+                    if (!ps.isEmpty()) {
+                        sb.append("PRICES YOU REMEMBER (exact, in diamonds; quote these):\n");
+                        for (String p : ps) sb.append("- ").append(p).append('\n');
+                    }
+                }
+                String town = City.persona();
+                if (!town.isEmpty()) sb.append("\nTOWN: ").append(town).append('\n');
+            } catch (Exception ignored) { }
         }
         return sb.toString();
     }

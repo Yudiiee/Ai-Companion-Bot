@@ -1,0 +1,5 @@
+name: community farm
+aliases: town farm, communal farm
+about: A fenced wheat field around a water channel, shared by the whole town.
+ground: 0
+front: south

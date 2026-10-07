@@ -1,0 +1,5 @@
+name: mall
+aliases: market hall, shopping mall, market
+about: A big stone market hall with a dozen stalls, the town's shared market.
+ground: 0
+front: south

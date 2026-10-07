@@ -739,7 +739,7 @@ final class Farm {
     }
 
     /** Seeds: pockets, chests, then breaking grass (wheat seeds drop from it now and then). */
-    private static void ensureSeeds(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, int want) throws InterruptedException {
+    static void ensureSeeds(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, int want) throws InterruptedException {
         int have = onServer(server, () -> seedCount(bot), 0);
         for (String[] s : SEEDS) {
             if (have >= want) return;
@@ -747,7 +747,7 @@ final class Farm {
         }
         if (have >= want) return;
         SurvivalBrain.maybeSay(server, b, HumanChat.pick("need seeds, gonna pull up some grass", "looking for seeds in the grass"), 0.7);
-        for (int broken = 0; broken < 40 && have < want && SurvivalBrain.jobAlive(b); broken++) {
+        for (int broken = 0; broken < 40 && have < want && SurvivalBrain.canContinue(b); broken++) {
             BlockPos g = onServer(server, () -> {
                 ServerLevel level = bot.level();
                 BlockPos f = BotPathing.feet(bot);

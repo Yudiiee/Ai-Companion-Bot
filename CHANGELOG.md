@@ -1,5 +1,30 @@
 # AI Companion - Changelog
 
+## 1.5.0 (Minecraft 26.3)
+
+- A diamond economy. Every companion remembers the price list (273 items, from poplar logs to the dragon egg); your
+  own prices go in `config/ai-companion/prices.txt` and win over the list. Things that aren't listed are worth what goes into
+  making them. "how much is a stack of iron", "what's an elytra worth".
+- Trading with players: "sell me 16 bread", "buy my 64 cobblestone", then "deal". It meets you, takes the diamonds
+  and hands over the goods (or the other way round). Shops sell at the list price and buy at 80% of it. Fractions
+  of a diamond go on a tab any companion honours: "what's my tab", "cash out". "what do you sell",
+  "how many diamonds do you have".
+- The companions keep their diamonds as their wallet (they no longer put them in chests).
+- A town, built together. Once everyone has a finished house (or when you say "let's build a city", "build a town
+  here", "...called Oakhollow"), they lay out a town near their homes: a plaza with a fountain, four avenues with
+  street lamps, a shared warehouse, a shop for each of them, three community farms, a temple, a mall, an
+  amphitheatre and town houses. Each one takes the next piece nobody's on, they ask each other in chat for what
+  they're short of and fetch it for each other, and they keep the town's farms harvested. "how's the town going",
+  "where's the temple", "work on the town", "forget the town".
+- The temple: once a day each companion takes some food up to the altar and leaves it in the offering chest.
+  "go make an offering".
+- Shops: each companion stocks its shop with what it gathered (ores, ingots, food, mob drops...), overflow goes on
+  a stall in the mall, and it empties its till now and then. When a companion needs something (food when it's
+  starving, a block for a build) it can buy it off another one's shelf and leave the diamonds in the till.
+- New designs: town plaza, temple, amphitheatre, shop, mall, community farm, warehouse (`city_*.nbt`).
+- The language model is told the prices of whatever the chat mentions, how the money works and how the town is going.
+- `/humanlike city on|off`, `/humanlike economy on|off`.
+
 ## 1.4.0 (Minecraft 26.3)
 
 - A recipe book every companion remembers: 171 recipes (26.3 additions like poplar wood and the straw bed, wool

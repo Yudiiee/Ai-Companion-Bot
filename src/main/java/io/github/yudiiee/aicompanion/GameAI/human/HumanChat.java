@@ -86,6 +86,15 @@ public final class HumanChat {
         NEXT_FREE.put(botName, at);
     }
 
+    /** Says something once {@code afterBot} has finished typing what it's saying (a reply to it). Safe from any thread. */
+    public static void sayAfter(MinecraftServer server, String botName, String afterBot, String rawText) {
+        if (afterBot != null && botName != null) {
+            long after = NEXT_FREE.getOrDefault(afterBot, 0L) + 700L + RNG.nextInt(1200);
+            NEXT_FREE.merge(botName, after, Math::max);
+        }
+        say(server, botName, rawText, true);
+    }
+
     /** Grey, clearly-not-a-player notice (connection status, errors for the owner). */
     public static void systemNotice(MinecraftServer server, String text) {
         if (server == null || text == null || text.isBlank()) return;

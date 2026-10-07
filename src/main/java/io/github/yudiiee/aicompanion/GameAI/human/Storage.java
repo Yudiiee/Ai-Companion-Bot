@@ -153,6 +153,7 @@ public final class Storage {
             kept.put("#food", have + s.getCount());
             return true;
         }
+        if (p.equals("diamond") && HumanConfig.get().economy) return true; // money: it stays in the wallet
         if (p.equals("torch") || p.equals("crafting_table") || p.equals("totem_of_undying") || p.endsWith("bucket")
                 || p.equals("furnace") || p.equals("chest") || p.endsWith("_bed")) return true;
         // a few of the basics a player keeps on hand
@@ -656,7 +657,7 @@ public final class Storage {
     }
 
     /** Takes up to {@code max} matching items out of {@code c} into the bot's pockets. Server thread. */
-    private static int take(ServerPlayer bot, Container c, Predicate<String> match, int max) {
+    static int take(ServerPlayer bot, Container c, Predicate<String> match, int max) {
         int left = max, n = 0;
         for (int i = 0; i < c.getContainerSize() && left > 0; i++) {
             ItemStack s = c.getItem(i);
@@ -711,7 +712,7 @@ public final class Storage {
     }
 
     /** The "other" half of a double chest (the half with the lower x/z counts for both). Server thread. */
-    private static boolean secondHalf(ServerLevel level, BlockPos p) {
+    static boolean secondHalf(ServerLevel level, BlockPos p) {
         if (!level.isLoaded(p)) return false;
         try {
             net.minecraft.world.level.block.state.BlockState s = level.getBlockState(p);

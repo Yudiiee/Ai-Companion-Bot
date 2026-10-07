@@ -1,0 +1,314 @@
+# ==============================================================================
+# MINECRAFT JAVA 26.3 ITEM & BLOCK VALUATION INDEX (DIAMOND STANDARD)
+# FORMAT: AI AGENT RETRIEVAL & MEMORY INGESTION SYSTEM
+# ==============================================================================
+# BASE CURRENCY: 1 minecraft:diamond = 1.0000 DIA
+#
+# PARSING SCHEMA:
+# PRICE | ID: <namespaced_id> | RATIO: <qty> <id> = <dia_count> DIA | UNIT_DIA: <dia_per_item> | RARITY: <tier> | CAT: <category>
+#
+# RARITY TIERS:
+#   T1_COMMON      : Abundant terrain & bulk materials (dirt, stone, netherrack)
+#   T2_UNCOMMON    : Renewable lumber, basic farm crops, glass, base wools
+#   T3_REFINED     : Smelted base metals, redstone, mob drops, standard food
+#   T4_PRECIOUS    : Gold, lapis, pearls, rods, mid-tier equipment
+#   T5_RARE        : Diamonds, emeralds, obsidian, potions, ancient debris
+#   T6_EPIC        : Netherite, totems, breeze/heavy core, mace, elytra, shulkers
+#   T7_LEGENDARY   : Nether stars, beacons, dragon egg, god apples
+# ==============================================================================
+
+### SECTION 1: 26.3 WILDERNESS & FURNITURE ADDITIONS
+PRICE | ID: minecraft:poplar_log | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:stripped_poplar_log | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:poplar_wood | RATIO: 24 = 1 DIA | UNIT_DIA: 0.04167 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:stripped_poplar_wood | RATIO: 24 = 1 DIA | UNIT_DIA: 0.04167 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:poplar_planks | RATIO: 128 = 1 DIA | UNIT_DIA: 0.00781 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:poplar_stairs | RATIO: 64 = 1 DIA | UNIT_DIA: 0.01563 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:poplar_slab | RATIO: 128 = 1 DIA | UNIT_DIA: 0.00781 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:poplar_fence | RATIO: 48 = 1 DIA | UNIT_DIA: 0.02083 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:poplar_fence_gate | RATIO: 16 = 1 DIA | UNIT_DIA: 0.06250 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:poplar_door | RATIO: 24 = 1 DIA | UNIT_DIA: 0.04167 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:poplar_trapdoor | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:poplar_pressure_plate | RATIO: 64 = 1 DIA | UNIT_DIA: 0.01563 | RARITY: T2_UNCOMMON | CAT: redstone
+PRICE | ID: minecraft:poplar_button | RATIO: 128 = 1 DIA | UNIT_DIA: 0.00781 | RARITY: T2_UNCOMMON | CAT: redstone
+PRICE | ID: minecraft:poplar_sign | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: decoration
+PRICE | ID: minecraft:poplar_hanging_sign | RATIO: 16 = 1 DIA | UNIT_DIA: 0.06250 | RARITY: T2_UNCOMMON | CAT: decoration
+PRICE | ID: minecraft:poplar_boat | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T2_UNCOMMON | CAT: transport
+PRICE | ID: minecraft:poplar_chest_boat | RATIO: 4 = 1 DIA | UNIT_DIA: 0.25000 | RARITY: T2_UNCOMMON | CAT: transport
+PRICE | ID: minecraft:poplar_sapling | RATIO: 16 = 1 DIA | UNIT_DIA: 0.06250 | RARITY: T2_UNCOMMON | CAT: vegetation
+PRICE | ID: minecraft:poplar_leaves | RATIO: 64 = 1 DIA | UNIT_DIA: 0.01563 | RARITY: T1_COMMON | CAT: vegetation
+PRICE | ID: minecraft:straw_bed | RATIO: 4 = 1 DIA | UNIT_DIA: 0.25000 | RARITY: T2_UNCOMMON | CAT: furniture
+PRICE | ID: minecraft:bracket_fungus | RATIO: 16 = 1 DIA | UNIT_DIA: 0.06250 | RARITY: T2_UNCOMMON | CAT: vegetation
+PRICE | ID: minecraft:white_cushion | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T2_UNCOMMON | CAT: furniture
+PRICE | ID: minecraft:orange_cushion | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T2_UNCOMMON | CAT: furniture
+PRICE | ID: minecraft:magenta_cushion | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T2_UNCOMMON | CAT: furniture
+PRICE | ID: minecraft:light_blue_cushion | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T2_UNCOMMON | CAT: furniture
+PRICE | ID: minecraft:yellow_cushion | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T2_UNCOMMON | CAT: furniture
+PRICE | ID: minecraft:lime_cushion | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T2_UNCOMMON | CAT: furniture
+PRICE | ID: minecraft:pink_cushion | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T2_UNCOMMON | CAT: furniture
+PRICE | ID: minecraft:gray_cushion | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T2_UNCOMMON | CAT: furniture
+PRICE | ID: minecraft:light_gray_cushion | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T2_UNCOMMON | CAT: furniture
+PRICE | ID: minecraft:cyan_cushion | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T2_UNCOMMON | CAT: furniture
+PRICE | ID: minecraft:purple_cushion | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T2_UNCOMMON | CAT: furniture
+PRICE | ID: minecraft:blue_cushion | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T2_UNCOMMON | CAT: furniture
+PRICE | ID: minecraft:brown_cushion | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T2_UNCOMMON | CAT: furniture
+PRICE | ID: minecraft:green_cushion | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T2_UNCOMMON | CAT: furniture
+PRICE | ID: minecraft:red_cushion | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T2_UNCOMMON | CAT: furniture
+PRICE | ID: minecraft:black_cushion | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T2_UNCOMMON | CAT: furniture
+PRICE | ID: minecraft:white_wool_stairs | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: building
+PRICE | ID: minecraft:white_wool_slab | RATIO: 64 = 1 DIA | UNIT_DIA: 0.01563 | RARITY: T2_UNCOMMON | CAT: building
+PRICE | ID: minecraft:white_concrete_stairs | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: building
+PRICE | ID: minecraft:white_concrete_slab | RATIO: 64 = 1 DIA | UNIT_DIA: 0.01563 | RARITY: T2_UNCOMMON | CAT: building
+
+### SECTION 2: RAW WOOD & LUMBER VARIANTS
+PRICE | ID: minecraft:oak_log | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:spruce_log | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:birch_log | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:jungle_log | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:acacia_log | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:dark_oak_log | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:mangrove_log | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:cherry_log | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:crimson_stem | RATIO: 24 = 1 DIA | UNIT_DIA: 0.04167 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:warped_stem | RATIO: 24 = 1 DIA | UNIT_DIA: 0.04167 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:bamboo_block | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:oak_planks | RATIO: 128 = 1 DIA | UNIT_DIA: 0.00781 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:spruce_planks | RATIO: 128 = 1 DIA | UNIT_DIA: 0.00781 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:birch_planks | RATIO: 128 = 1 DIA | UNIT_DIA: 0.00781 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:jungle_planks | RATIO: 128 = 1 DIA | UNIT_DIA: 0.00781 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:acacia_planks | RATIO: 128 = 1 DIA | UNIT_DIA: 0.00781 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:dark_oak_planks | RATIO: 128 = 1 DIA | UNIT_DIA: 0.00781 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:mangrove_planks | RATIO: 128 = 1 DIA | UNIT_DIA: 0.00781 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:cherry_planks | RATIO: 128 = 1 DIA | UNIT_DIA: 0.00781 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:crimson_planks | RATIO: 96 = 1 DIA | UNIT_DIA: 0.01042 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:warped_planks | RATIO: 96 = 1 DIA | UNIT_DIA: 0.01042 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:bamboo_planks | RATIO: 128 = 1 DIA | UNIT_DIA: 0.00781 | RARITY: T2_UNCOMMON | CAT: wood
+PRICE | ID: minecraft:stick | RATIO: 256 = 1 DIA | UNIT_DIA: 0.00391 | RARITY: T1_COMMON | CAT: wood
+
+### SECTION 3: TERRAINS, BULK STONE & GEOLOGY
+PRICE | ID: minecraft:dirt | RATIO: 128 = 1 DIA | UNIT_DIA: 0.00781 | RARITY: T1_COMMON | CAT: terrain
+PRICE | ID: minecraft:grass_block | RATIO: 64 = 1 DIA | UNIT_DIA: 0.01563 | RARITY: T2_UNCOMMON | CAT: terrain
+PRICE | ID: minecraft:cobblestone | RATIO: 128 = 1 DIA | UNIT_DIA: 0.00781 | RARITY: T1_COMMON | CAT: stone
+PRICE | ID: minecraft:stone | RATIO: 64 = 1 DIA | UNIT_DIA: 0.01563 | RARITY: T1_COMMON | CAT: stone
+PRICE | ID: minecraft:smooth_stone | RATIO: 48 = 1 DIA | UNIT_DIA: 0.02083 | RARITY: T2_UNCOMMON | CAT: stone
+PRICE | ID: minecraft:deepslate | RATIO: 64 = 1 DIA | UNIT_DIA: 0.01563 | RARITY: T1_COMMON | CAT: stone
+PRICE | ID: minecraft:cobbled_deepslate | RATIO: 96 = 1 DIA | UNIT_DIA: 0.01042 | RARITY: T1_COMMON | CAT: stone
+PRICE | ID: minecraft:granite | RATIO: 64 = 1 DIA | UNIT_DIA: 0.01563 | RARITY: T1_COMMON | CAT: stone
+PRICE | ID: minecraft:diorite | RATIO: 64 = 1 DIA | UNIT_DIA: 0.01563 | RARITY: T1_COMMON | CAT: stone
+PRICE | ID: minecraft:andesite | RATIO: 64 = 1 DIA | UNIT_DIA: 0.01563 | RARITY: T1_COMMON | CAT: stone
+PRICE | ID: minecraft:calcite | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: stone
+PRICE | ID: minecraft:tuff | RATIO: 64 = 1 DIA | UNIT_DIA: 0.01563 | RARITY: T1_COMMON | CAT: stone
+PRICE | ID: minecraft:sand | RATIO: 64 = 1 DIA | UNIT_DIA: 0.01563 | RARITY: T1_COMMON | CAT: terrain
+PRICE | ID: minecraft:red_sand | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: terrain
+PRICE | ID: minecraft:gravel | RATIO: 64 = 1 DIA | UNIT_DIA: 0.01563 | RARITY: T1_COMMON | CAT: terrain
+PRICE | ID: minecraft:clay | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: terrain
+PRICE | ID: minecraft:clay_ball | RATIO: 128 = 1 DIA | UNIT_DIA: 0.00781 | RARITY: T1_COMMON | CAT: material
+PRICE | ID: minecraft:netherrack | RATIO: 256 = 1 DIA | UNIT_DIA: 0.00391 | RARITY: T1_COMMON | CAT: nether
+PRICE | ID: minecraft:soul_sand | RATIO: 48 = 1 DIA | UNIT_DIA: 0.02083 | RARITY: T2_UNCOMMON | CAT: nether
+PRICE | ID: minecraft:soul_soil | RATIO: 48 = 1 DIA | UNIT_DIA: 0.02083 | RARITY: T2_UNCOMMON | CAT: nether
+PRICE | ID: minecraft:basalt | RATIO: 64 = 1 DIA | UNIT_DIA: 0.01563 | RARITY: T1_COMMON | CAT: nether
+PRICE | ID: minecraft:blackstone | RATIO: 64 = 1 DIA | UNIT_DIA: 0.01563 | RARITY: T1_COMMON | CAT: nether
+PRICE | ID: minecraft:end_stone | RATIO: 64 = 1 DIA | UNIT_DIA: 0.01563 | RARITY: T2_UNCOMMON | CAT: end
+PRICE | ID: minecraft:obsidian | RATIO: 4 = 1 DIA | UNIT_DIA: 0.25000 | RARITY: T4_PRECIOUS | CAT: block
+PRICE | ID: minecraft:crying_obsidian | RATIO: 2 = 1 DIA | UNIT_DIA: 0.50000 | RARITY: T5_RARE | CAT: block
+
+### SECTION 4: ORES, MINERALS, METALS & GEMS
+PRICE | ID: minecraft:coal | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: minerals
+PRICE | ID: minecraft:coal_block | RATIO: 4 = 1 DIA | UNIT_DIA: 0.25000 | RARITY: T3_REFINED | CAT: minerals
+PRICE | ID: minecraft:charcoal | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: minerals
+PRICE | ID: minecraft:raw_copper | RATIO: 24 = 1 DIA | UNIT_DIA: 0.04167 | RARITY: T2_UNCOMMON | CAT: metallurgy
+PRICE | ID: minecraft:copper_ingot | RATIO: 16 = 1 DIA | UNIT_DIA: 0.06250 | RARITY: T3_REFINED | CAT: metallurgy
+PRICE | ID: minecraft:copper_block | RATIO: 2 = 1 DIA | UNIT_DIA: 0.50000 | RARITY: T3_REFINED | CAT: metallurgy
+PRICE | ID: minecraft:raw_iron | RATIO: 12 = 1 DIA | UNIT_DIA: 0.08333 | RARITY: T3_REFINED | CAT: metallurgy
+PRICE | ID: minecraft:iron_ingot | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T3_REFINED | CAT: metallurgy
+PRICE | ID: minecraft:iron_block | RATIO: 1 = 1.125 DIA | UNIT_DIA: 1.12500 | RARITY: T4_PRECIOUS | CAT: metallurgy
+PRICE | ID: minecraft:iron_nugget | RATIO: 72 = 1 DIA | UNIT_DIA: 0.01389 | RARITY: T2_UNCOMMON | CAT: metallurgy
+PRICE | ID: minecraft:raw_gold | RATIO: 6 = 1 DIA | UNIT_DIA: 0.16667 | RARITY: T3_REFINED | CAT: metallurgy
+PRICE | ID: minecraft:gold_ingot | RATIO: 4 = 1 DIA | UNIT_DIA: 0.25000 | RARITY: T4_PRECIOUS | CAT: metallurgy
+PRICE | ID: minecraft:gold_block | RATIO: 1 = 2.25 DIA | UNIT_DIA: 2.25000 | RARITY: T4_PRECIOUS | CAT: metallurgy
+PRICE | ID: minecraft:gold_nugget | RATIO: 36 = 1 DIA | UNIT_DIA: 0.02778 | RARITY: T3_REFINED | CAT: metallurgy
+PRICE | ID: minecraft:redstone | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T3_REFINED | CAT: redstone
+PRICE | ID: minecraft:redstone_block | RATIO: 4 = 1 DIA | UNIT_DIA: 0.25000 | RARITY: T3_REFINED | CAT: redstone
+PRICE | ID: minecraft:lapis_lazuli | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T3_REFINED | CAT: minerals
+PRICE | ID: minecraft:lapis_block | RATIO: 4 = 1 DIA | UNIT_DIA: 0.25000 | RARITY: T3_REFINED | CAT: minerals
+PRICE | ID: minecraft:amethyst_shard | RATIO: 16 = 1 DIA | UNIT_DIA: 0.06250 | RARITY: T3_REFINED | CAT: minerals
+PRICE | ID: minecraft:amethyst_block | RATIO: 4 = 1 DIA | UNIT_DIA: 0.25000 | RARITY: T3_REFINED | CAT: minerals
+PRICE | ID: minecraft:quartz | RATIO: 16 = 1 DIA | UNIT_DIA: 0.06250 | RARITY: T3_REFINED | CAT: minerals
+PRICE | ID: minecraft:quartz_block | RATIO: 4 = 1 DIA | UNIT_DIA: 0.25000 | RARITY: T3_REFINED | CAT: minerals
+PRICE | ID: minecraft:emerald | RATIO: 2 = 1 DIA | UNIT_DIA: 0.50000 | RARITY: T4_PRECIOUS | CAT: currency
+PRICE | ID: minecraft:emerald_block | RATIO: 1 = 4.5 DIA | UNIT_DIA: 4.50000 | RARITY: T5_RARE | CAT: currency
+PRICE | ID: minecraft:diamond | RATIO: 1 = 1 DIA | UNIT_DIA: 1.00000 | RARITY: T5_RARE | CAT: standard
+PRICE | ID: minecraft:diamond_block | RATIO: 1 = 9 DIA | UNIT_DIA: 9.00000 | RARITY: T5_RARE | CAT: standard
+PRICE | ID: minecraft:ancient_debris | RATIO: 1 = 3 DIA | UNIT_DIA: 3.00000 | RARITY: T6_EPIC | CAT: netherite
+PRICE | ID: minecraft:netherite_scrap | RATIO: 1 = 3.5 DIA | UNIT_DIA: 3.50000 | RARITY: T6_EPIC | CAT: netherite
+PRICE | ID: minecraft:netherite_ingot | RATIO: 1 = 16 DIA | UNIT_DIA: 16.00000 | RARITY: T6_EPIC | CAT: netherite
+PRICE | ID: minecraft:netherite_block | RATIO: 1 = 144 DIA | UNIT_DIA: 144.00000 | RARITY: T7_LEGENDARY | CAT: netherite
+
+### SECTION 5: WORKSTATIONS, CONTAINERS & UTILITY
+PRICE | ID: minecraft:crafting_table | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: workstation
+PRICE | ID: minecraft:furnace | RATIO: 16 = 1 DIA | UNIT_DIA: 0.06250 | RARITY: T2_UNCOMMON | CAT: workstation
+PRICE | ID: minecraft:chest | RATIO: 16 = 1 DIA | UNIT_DIA: 0.06250 | RARITY: T2_UNCOMMON | CAT: container
+PRICE | ID: minecraft:barrel | RATIO: 16 = 1 DIA | UNIT_DIA: 0.06250 | RARITY: T2_UNCOMMON | CAT: container
+PRICE | ID: minecraft:blast_furnace | RATIO: 1 = 0.75 DIA | UNIT_DIA: 0.75000 | RARITY: T3_REFINED | CAT: workstation
+PRICE | ID: minecraft:smoker | RATIO: 4 = 1 DIA | UNIT_DIA: 0.25000 | RARITY: T2_UNCOMMON | CAT: workstation
+PRICE | ID: minecraft:campfire | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T2_UNCOMMON | CAT: workstation
+PRICE | ID: minecraft:soul_campfire | RATIO: 4 = 1 DIA | UNIT_DIA: 0.25000 | RARITY: T3_REFINED | CAT: workstation
+PRICE | ID: minecraft:stonecutter | RATIO: 4 = 1 DIA | UNIT_DIA: 0.25000 | RARITY: T3_REFINED | CAT: workstation
+PRICE | ID: minecraft:smithing_table | RATIO: 2 = 1 DIA | UNIT_DIA: 0.50000 | RARITY: T3_REFINED | CAT: workstation
+PRICE | ID: minecraft:grindstone | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T2_UNCOMMON | CAT: workstation
+PRICE | ID: minecraft:brewing_stand | RATIO: 1 = 1 DIA | UNIT_DIA: 1.00000 | RARITY: T4_PRECIOUS | CAT: workstation
+PRICE | ID: minecraft:cauldron | RATIO: 1 = 0.875 DIA | UNIT_DIA: 0.87500 | RARITY: T3_REFINED | CAT: functional
+PRICE | ID: minecraft:composter | RATIO: 16 = 1 DIA | UNIT_DIA: 0.06250 | RARITY: T2_UNCOMMON | CAT: functional
+PRICE | ID: minecraft:cartography_table | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T2_UNCOMMON | CAT: workstation
+PRICE | ID: minecraft:fletching_table | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T2_UNCOMMON | CAT: workstation
+PRICE | ID: minecraft:loom | RATIO: 16 = 1 DIA | UNIT_DIA: 0.06250 | RARITY: T2_UNCOMMON | CAT: workstation
+PRICE | ID: minecraft:anvil | RATIO: 1 = 4 DIA | UNIT_DIA: 4.00000 | RARITY: T4_PRECIOUS | CAT: workstation
+PRICE | ID: minecraft:enchanting_table | RATIO: 1 = 4 DIA | UNIT_DIA: 4.00000 | RARITY: T5_RARE | CAT: workstation
+PRICE | ID: minecraft:bookshelf | RATIO: 4 = 1 DIA | UNIT_DIA: 0.25000 | RARITY: T3_REFINED | CAT: decoration
+PRICE | ID: minecraft:chiseled_bookshelf | RATIO: 4 = 1 DIA | UNIT_DIA: 0.25000 | RARITY: T3_REFINED | CAT: decoration
+PRICE | ID: minecraft:ender_chest | RATIO: 1 = 2.5 DIA | UNIT_DIA: 2.50000 | RARITY: T5_RARE | CAT: container
+PRICE | ID: minecraft:shulker_box | RATIO: 1 = 5 DIA | UNIT_DIA: 5.00000 | RARITY: T6_EPIC | CAT: container
+PRICE | ID: minecraft:beacon | RATIO: 1 = 28 DIA | UNIT_DIA: 28.00000 | RARITY: T7_LEGENDARY | CAT: endgame
+PRICE | ID: minecraft:conduit | RATIO: 1 = 12 DIA | UNIT_DIA: 12.00000 | RARITY: T6_EPIC | CAT: endgame
+PRICE | ID: minecraft:respawn_anchor | RATIO: 1 = 6 DIA | UNIT_DIA: 6.00000 | RARITY: T5_RARE | CAT: functional
+PRICE | ID: minecraft:lodestone | RATIO: 1 = 18 DIA | UNIT_DIA: 18.00000 | RARITY: T6_EPIC | CAT: functional
+
+### SECTION 6: REDSTONE & MECHANISMS
+PRICE | ID: minecraft:crafter | RATIO: 1 = 1.5 DIA | UNIT_DIA: 1.50000 | RARITY: T4_PRECIOUS | CAT: redstone
+PRICE | ID: minecraft:copper_bulb | RATIO: 2 = 1 DIA | UNIT_DIA: 0.50000 | RARITY: T3_REFINED | CAT: redstone
+PRICE | ID: minecraft:piston | RATIO: 4 = 1 DIA | UNIT_DIA: 0.25000 | RARITY: T3_REFINED | CAT: redstone
+PRICE | ID: minecraft:sticky_piston | RATIO: 2 = 1 DIA | UNIT_DIA: 0.50000 | RARITY: T3_REFINED | CAT: redstone
+PRICE | ID: minecraft:dispenser | RATIO: 2 = 1 DIA | UNIT_DIA: 0.50000 | RARITY: T3_REFINED | CAT: redstone
+PRICE | ID: minecraft:dropper | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T2_UNCOMMON | CAT: redstone
+PRICE | ID: minecraft:observer | RATIO: 4 = 1 DIA | UNIT_DIA: 0.25000 | RARITY: T3_REFINED | CAT: redstone
+PRICE | ID: minecraft:hopper | RATIO: 1 = 0.85 DIA | UNIT_DIA: 0.85000 | RARITY: T3_REFINED | CAT: redstone
+PRICE | ID: minecraft:repeater | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T3_REFINED | CAT: redstone
+PRICE | ID: minecraft:comparator | RATIO: 4 = 1 DIA | UNIT_DIA: 0.25000 | RARITY: T3_REFINED | CAT: redstone
+PRICE | ID: minecraft:redstone_torch | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: redstone
+PRICE | ID: minecraft:redstone_lamp | RATIO: 2 = 1 DIA | UNIT_DIA: 0.50000 | RARITY: T3_REFINED | CAT: redstone
+PRICE | ID: minecraft:daylight_detector | RATIO: 2 = 1 DIA | UNIT_DIA: 0.50000 | RARITY: T3_REFINED | CAT: redstone
+PRICE | ID: minecraft:tripwire_hook | RATIO: 16 = 1 DIA | UNIT_DIA: 0.06250 | RARITY: T2_UNCOMMON | CAT: redstone
+PRICE | ID: minecraft:target | RATIO: 4 = 1 DIA | UNIT_DIA: 0.25000 | RARITY: T3_REFINED | CAT: redstone
+PRICE | ID: minecraft:lever | RATIO: 64 = 1 DIA | UNIT_DIA: 0.01563 | RARITY: T1_COMMON | CAT: redstone
+
+### SECTION 7: MOB DROPS & SURVIVAL RESOURCES
+PRICE | ID: minecraft:rotten_flesh | RATIO: 64 = 1 DIA | UNIT_DIA: 0.01563 | RARITY: T1_COMMON | CAT: mob_drops
+PRICE | ID: minecraft:bone | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: mob_drops
+PRICE | ID: minecraft:bone_meal | RATIO: 96 = 1 DIA | UNIT_DIA: 0.01042 | RARITY: T1_COMMON | CAT: mob_drops
+PRICE | ID: minecraft:string | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: mob_drops
+PRICE | ID: minecraft:spider_eye | RATIO: 24 = 1 DIA | UNIT_DIA: 0.04167 | RARITY: T2_UNCOMMON | CAT: mob_drops
+PRICE | ID: minecraft:gunpowder | RATIO: 16 = 1 DIA | UNIT_DIA: 0.06250 | RARITY: T3_REFINED | CAT: mob_drops
+PRICE | ID: minecraft:feather | RATIO: 48 = 1 DIA | UNIT_DIA: 0.02083 | RARITY: T1_COMMON | CAT: mob_drops
+PRICE | ID: minecraft:leather | RATIO: 16 = 1 DIA | UNIT_DIA: 0.06250 | RARITY: T2_UNCOMMON | CAT: mob_drops
+PRICE | ID: minecraft:slime_ball | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T3_REFINED | CAT: mob_drops
+PRICE | ID: minecraft:ender_pearl | RATIO: 4 = 1 DIA | UNIT_DIA: 0.25000 | RARITY: T4_PRECIOUS | CAT: mob_drops
+PRICE | ID: minecraft:ender_eye | RATIO: 2 = 1 DIA | UNIT_DIA: 0.50000 | RARITY: T4_PRECIOUS | CAT: mob_drops
+PRICE | ID: minecraft:blaze_rod | RATIO: 2 = 1 DIA | UNIT_DIA: 0.50000 | RARITY: T4_PRECIOUS | CAT: mob_drops
+PRICE | ID: minecraft:blaze_powder | RATIO: 4 = 1 DIA | UNIT_DIA: 0.25000 | RARITY: T3_REFINED | CAT: mob_drops
+PRICE | ID: minecraft:ghast_tear | RATIO: 1 = 1.5 DIA | UNIT_DIA: 1.50000 | RARITY: T5_RARE | CAT: mob_drops
+PRICE | ID: minecraft:magma_cream | RATIO: 4 = 1 DIA | UNIT_DIA: 0.25000 | RARITY: T3_REFINED | CAT: mob_drops
+PRICE | ID: minecraft:phantom_membrane | RATIO: 2 = 1 DIA | UNIT_DIA: 0.50000 | RARITY: T4_PRECIOUS | CAT: mob_drops
+PRICE | ID: minecraft:shulker_shell | RATIO: 1 = 2 DIA | UNIT_DIA: 2.00000 | RARITY: T6_EPIC | CAT: mob_drops
+PRICE | ID: minecraft:nautilus_shell | RATIO: 1 = 1 DIA | UNIT_DIA: 1.00000 | RARITY: T4_PRECIOUS | CAT: mob_drops
+PRICE | ID: minecraft:heart_of_the_sea | RATIO: 1 = 5 DIA | UNIT_DIA: 5.00000 | RARITY: T6_EPIC | CAT: rare_find
+PRICE | ID: minecraft:breeze_rod | RATIO: 1 = 1 DIA | UNIT_DIA: 1.00000 | RARITY: T4_PRECIOUS | CAT: trial_chamber
+PRICE | ID: minecraft:wind_charge | RATIO: 4 = 1 DIA | UNIT_DIA: 0.25000 | RARITY: T3_REFINED | CAT: combat
+PRICE | ID: minecraft:heavy_core | RATIO: 1 = 32 DIA | UNIT_DIA: 32.00000 | RARITY: T6_EPIC | CAT: trial_chamber
+PRICE | ID: minecraft:trial_key | RATIO: 1 = 1.5 DIA | UNIT_DIA: 1.50000 | RARITY: T4_PRECIOUS | CAT: trial_chamber
+PRICE | ID: minecraft:ominous_trial_key | RATIO: 1 = 4 DIA | UNIT_DIA: 4.00000 | RARITY: T5_RARE | CAT: trial_chamber
+
+### SECTION 8: FOOD, CROPS & CONSUMABLES
+PRICE | ID: minecraft:wheat | RATIO: 48 = 1 DIA | UNIT_DIA: 0.02083 | RARITY: T1_COMMON | CAT: food
+PRICE | ID: minecraft:wheat_seeds | RATIO: 96 = 1 DIA | UNIT_DIA: 0.01042 | RARITY: T1_COMMON | CAT: food
+PRICE | ID: minecraft:bread | RATIO: 16 = 1 DIA | UNIT_DIA: 0.06250 | RARITY: T2_UNCOMMON | CAT: food
+PRICE | ID: minecraft:carrot | RATIO: 48 = 1 DIA | UNIT_DIA: 0.02083 | RARITY: T1_COMMON | CAT: food
+PRICE | ID: minecraft:potato | RATIO: 48 = 1 DIA | UNIT_DIA: 0.02083 | RARITY: T1_COMMON | CAT: food
+PRICE | ID: minecraft:baked_potato | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: food
+PRICE | ID: minecraft:poisonous_potato | RATIO: 16 = 1 DIA | UNIT_DIA: 0.06250 | RARITY: T2_UNCOMMON | CAT: junk
+PRICE | ID: minecraft:beetroot | RATIO: 48 = 1 DIA | UNIT_DIA: 0.02083 | RARITY: T1_COMMON | CAT: food
+PRICE | ID: minecraft:apple | RATIO: 16 = 1 DIA | UNIT_DIA: 0.06250 | RARITY: T2_UNCOMMON | CAT: food
+PRICE | ID: minecraft:golden_carrot | RATIO: 2 = 1 DIA | UNIT_DIA: 0.50000 | RARITY: T4_PRECIOUS | CAT: food
+PRICE | ID: minecraft:golden_apple | RATIO: 1 = 2.5 DIA | UNIT_DIA: 2.50000 | RARITY: T4_PRECIOUS | CAT: food
+PRICE | ID: minecraft:enchanted_golden_apple | RATIO: 1 = 36 DIA | UNIT_DIA: 36.00000 | RARITY: T7_LEGENDARY | CAT: food
+PRICE | ID: minecraft:melon_slice | RATIO: 64 = 1 DIA | UNIT_DIA: 0.01563 | RARITY: T1_COMMON | CAT: food
+PRICE | ID: minecraft:sweet_berries | RATIO: 64 = 1 DIA | UNIT_DIA: 0.01563 | RARITY: T1_COMMON | CAT: food
+PRICE | ID: minecraft:glow_berries | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: food
+PRICE | ID: minecraft:cooked_beef | RATIO: 16 = 1 DIA | UNIT_DIA: 0.06250 | RARITY: T2_UNCOMMON | CAT: food
+PRICE | ID: minecraft:cooked_porkchop | RATIO: 16 = 1 DIA | UNIT_DIA: 0.06250 | RARITY: T2_UNCOMMON | CAT: food
+PRICE | ID: minecraft:cooked_mutton | RATIO: 16 = 1 DIA | UNIT_DIA: 0.06250 | RARITY: T2_UNCOMMON | CAT: food
+PRICE | ID: minecraft:cooked_chicken | RATIO: 24 = 1 DIA | UNIT_DIA: 0.04167 | RARITY: T2_UNCOMMON | CAT: food
+PRICE | ID: minecraft:sugar_cane | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: farmable
+PRICE | ID: minecraft:sugar | RATIO: 32 = 1 DIA | UNIT_DIA: 0.03125 | RARITY: T2_UNCOMMON | CAT: food
+PRICE | ID: minecraft:paper | RATIO: 24 = 1 DIA | UNIT_DIA: 0.04167 | RARITY: T2_UNCOMMON | CAT: crafting
+PRICE | ID: minecraft:book | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T3_REFINED | CAT: crafting
+PRICE | ID: minecraft:honey_bottle | RATIO: 4 = 1 DIA | UNIT_DIA: 0.25000 | RARITY: T3_REFINED | CAT: food
+PRICE | ID: minecraft:honey_comb | RATIO: 8 = 1 DIA | UNIT_DIA: 0.12500 | RARITY: T3_REFINED | CAT: material
+
+### SECTION 9: TOOLS, WEAPONS & ARMOR
+PRICE | ID: minecraft:iron_sword | RATIO: 3 = 1 DIA | UNIT_DIA: 0.33333 | RARITY: T3_REFINED | CAT: combat
+PRICE | ID: minecraft:iron_pickaxe | RATIO: 2 = 1 DIA | UNIT_DIA: 0.50000 | RARITY: T3_REFINED | CAT: tools
+PRICE | ID: minecraft:iron_axe | RATIO: 2 = 1 DIA | UNIT_DIA: 0.50000 | RARITY: T3_REFINED | CAT: tools
+PRICE | ID: minecraft:iron_shovel | RATIO: 6 = 1 DIA | UNIT_DIA: 0.16667 | RARITY: T3_REFINED | CAT: tools
+PRICE | ID: minecraft:iron_hoe | RATIO: 3 = 1 DIA | UNIT_DIA: 0.33333 | RARITY: T3_REFINED | CAT: tools
+PRICE | ID: minecraft:iron_helmet | RATIO: 1 = 0.7 DIA | UNIT_DIA: 0.70000 | RARITY: T3_REFINED | CAT: armor
+PRICE | ID: minecraft:iron_chestplate | RATIO: 1 = 1.1 DIA | UNIT_DIA: 1.10000 | RARITY: T3_REFINED | CAT: armor
+PRICE | ID: minecraft:iron_leggings | RATIO: 1 = 0.95 DIA | UNIT_DIA: 0.95000 | RARITY: T3_REFINED | CAT: armor
+PRICE | ID: minecraft:iron_boots | RATIO: 1 = 0.55 DIA | UNIT_DIA: 0.55000 | RARITY: T3_REFINED | CAT: armor
+PRICE | ID: minecraft:shield | RATIO: 4 = 1 DIA | UNIT_DIA: 0.25000 | RARITY: T3_REFINED | CAT: combat
+PRICE | ID: minecraft:bow | RATIO: 4 = 1 DIA | UNIT_DIA: 0.25000 | RARITY: T3_REFINED | CAT: combat
+PRICE | ID: minecraft:crossbow | RATIO: 2 = 1 DIA | UNIT_DIA: 0.50000 | RARITY: T3_REFINED | CAT: combat
+PRICE | ID: minecraft:arrow | RATIO: 64 = 1 DIA | UNIT_DIA: 0.01563 | RARITY: T2_UNCOMMON | CAT: combat
+PRICE | ID: minecraft:diamond_sword | RATIO: 1 = 2.1 DIA | UNIT_DIA: 2.10000 | RARITY: T5_RARE | CAT: combat
+PRICE | ID: minecraft:diamond_pickaxe | RATIO: 1 = 3.1 DIA | UNIT_DIA: 3.10000 | RARITY: T5_RARE | CAT: tools
+PRICE | ID: minecraft:diamond_axe | RATIO: 1 = 3.1 DIA | UNIT_DIA: 3.10000 | RARITY: T5_RARE | CAT: tools
+PRICE | ID: minecraft:diamond_shovel | RATIO: 1 = 1.1 DIA | UNIT_DIA: 1.10000 | RARITY: T5_RARE | CAT: tools
+PRICE | ID: minecraft:diamond_hoe | RATIO: 1 = 2.1 DIA | UNIT_DIA: 2.10000 | RARITY: T5_RARE | CAT: tools
+PRICE | ID: minecraft:diamond_helmet | RATIO: 1 = 5.2 DIA | UNIT_DIA: 5.20000 | RARITY: T5_RARE | CAT: armor
+PRICE | ID: minecraft:diamond_chestplate | RATIO: 1 = 8.2 DIA | UNIT_DIA: 8.20000 | RARITY: T5_RARE | CAT: armor
+PRICE | ID: minecraft:diamond_leggings | RATIO: 1 = 7.2 DIA | UNIT_DIA: 7.20000 | RARITY: T5_RARE | CAT: armor
+PRICE | ID: minecraft:diamond_boots | RATIO: 1 = 4.2 DIA | UNIT_DIA: 4.20000 | RARITY: T5_RARE | CAT: armor
+PRICE | ID: minecraft:netherite_sword | RATIO: 1 = 22 DIA | UNIT_DIA: 22.00000 | RARITY: T6_EPIC | CAT: combat
+PRICE | ID: minecraft:netherite_pickaxe | RATIO: 1 = 23 DIA | UNIT_DIA: 23.00000 | RARITY: T6_EPIC | CAT: tools
+PRICE | ID: minecraft:netherite_axe | RATIO: 1 = 23 DIA | UNIT_DIA: 23.00000 | RARITY: T6_EPIC | CAT: tools
+PRICE | ID: minecraft:netherite_shovel | RATIO: 1 = 21 DIA | UNIT_DIA: 21.00000 | RARITY: T6_EPIC | CAT: tools
+PRICE | ID: minecraft:netherite_hoe | RATIO: 1 = 22 DIA | UNIT_DIA: 22.00000 | RARITY: T6_EPIC | CAT: tools
+PRICE | ID: minecraft:netherite_helmet | RATIO: 1 = 25 DIA | UNIT_DIA: 25.00000 | RARITY: T6_EPIC | CAT: armor
+PRICE | ID: minecraft:netherite_chestplate | RATIO: 1 = 28 DIA | UNIT_DIA: 28.00000 | RARITY: T6_EPIC | CAT: armor
+PRICE | ID: minecraft:netherite_leggings | RATIO: 1 = 27 DIA | UNIT_DIA: 27.00000 | RARITY: T6_EPIC | CAT: armor
+PRICE | ID: minecraft:netherite_boots | RATIO: 1 = 24 DIA | UNIT_DIA: 24.00000 | RARITY: T6_EPIC | CAT: armor
+PRICE | ID: minecraft:mace | RATIO: 1 = 36 DIA | UNIT_DIA: 36.00000 | RARITY: T6_EPIC | CAT: combat
+PRICE | ID: minecraft:trident | RATIO: 1 = 12 DIA | UNIT_DIA: 12.00000 | RARITY: T5_RARE | CAT: combat
+PRICE | ID: minecraft:elytra | RATIO: 1 = 32 DIA | UNIT_DIA: 32.00000 | RARITY: T6_EPIC | CAT: transport
+PRICE | ID: minecraft:totem_of_undying | RATIO: 1 = 8 DIA | UNIT_DIA: 8.00000 | RARITY: T6_EPIC | CAT: utility
+
+### SECTION 10: SMITHING TEMPLATES, RELICS & TROPHIES
+PRICE | ID: minecraft:netherite_upgrade_smithing_template | RATIO: 1 = 7 DIA | UNIT_DIA: 7.00000 | RARITY: T5_RARE | CAT: template
+PRICE | ID: minecraft:sentry_armor_trim_smithing_template | RATIO: 1 = 3 DIA | UNIT_DIA: 3.00000 | RARITY: T5_RARE | CAT: template
+PRICE | ID: minecraft:vex_armor_trim_smithing_template | RATIO: 1 = 5 DIA | UNIT_DIA: 5.00000 | RARITY: T5_RARE | CAT: template
+PRICE | ID: minecraft:wild_armor_trim_smithing_template | RATIO: 1 = 3 DIA | UNIT_DIA: 3.00000 | RARITY: T5_RARE | CAT: template
+PRICE | ID: minecraft:coast_armor_trim_smithing_template | RATIO: 1 = 3 DIA | UNIT_DIA: 3.00000 | RARITY: T5_RARE | CAT: template
+PRICE | ID: minecraft:dune_armor_trim_smithing_template | RATIO: 1 = 3 DIA | UNIT_DIA: 3.00000 | RARITY: T5_RARE | CAT: template
+PRICE | ID: minecraft:wayfinder_armor_trim_smithing_template | RATIO: 1 = 4 DIA | UNIT_DIA: 4.00000 | RARITY: T5_RARE | CAT: template
+PRICE | ID: minecraft:raiser_armor_trim_smithing_template | RATIO: 1 = 4 DIA | UNIT_DIA: 4.00000 | RARITY: T5_RARE | CAT: template
+PRICE | ID: minecraft:shaper_armor_trim_smithing_template | RATIO: 1 = 4 DIA | UNIT_DIA: 4.00000 | RARITY: T5_RARE | CAT: template
+PRICE | ID: minecraft:host_armor_trim_smithing_template | RATIO: 1 = 4 DIA | UNIT_DIA: 4.00000 | RARITY: T5_RARE | CAT: template
+PRICE | ID: minecraft:ward_armor_trim_smithing_template | RATIO: 1 = 8 DIA | UNIT_DIA: 8.00000 | RARITY: T6_EPIC | CAT: template
+PRICE | ID: minecraft:silence_armor_trim_smithing_template | RATIO: 1 = 20 DIA | UNIT_DIA: 20.00000 | RARITY: T7_LEGENDARY | CAT: template
+PRICE | ID: minecraft:tide_armor_trim_smithing_template | RATIO: 1 = 6 DIA | UNIT_DIA: 6.00000 | RARITY: T5_RARE | CAT: template
+PRICE | ID: minecraft:snout_armor_trim_smithing_template | RATIO: 1 = 5 DIA | UNIT_DIA: 5.00000 | RARITY: T5_RARE | CAT: template
+PRICE | ID: minecraft:rib_armor_trim_smithing_template | RATIO: 1 = 6 DIA | UNIT_DIA: 6.00000 | RARITY: T5_RARE | CAT: template
+PRICE | ID: minecraft:eye_armor_trim_smithing_template | RATIO: 1 = 5 DIA | UNIT_DIA: 5.00000 | RARITY: T5_RARE | CAT: template
+PRICE | ID: minecraft:spire_armor_trim_smithing_template | RATIO: 1 = 8 DIA | UNIT_DIA: 8.00000 | RARITY: T6_EPIC | CAT: template
+PRICE | ID: minecraft:flow_armor_trim_smithing_template | RATIO: 1 = 10 DIA | UNIT_DIA: 10.00000 | RARITY: T6_EPIC | CAT: template
+PRICE | ID: minecraft:bolt_armor_trim_smithing_template | RATIO: 1 = 8 DIA | UNIT_DIA: 8.00000 | RARITY: T6_EPIC | CAT: template
+PRICE | ID: minecraft:nether_star | RATIO: 1 = 24 DIA | UNIT_DIA: 24.00000 | RARITY: T7_LEGENDARY | CAT: trophy
+PRICE | ID: minecraft:dragon_egg | RATIO: 1 = 64 DIA | UNIT_DIA: 64.00000 | RARITY: T7_LEGENDARY | CAT: trophy
+PRICE | ID: minecraft:dragon_head | RATIO: 1 = 16 DIA | UNIT_DIA: 16.00000 | RARITY: T6_EPIC | CAT: trophy
+PRICE | ID: minecraft:wither_skeleton_skull | RATIO: 1 = 6 DIA | UNIT_DIA: 6.00000 | RARITY: T5_RARE | CAT: mob_drops
+PRICE | ID: minecraft:skeleton_skull | RATIO: 1 = 8 DIA | UNIT_DIA: 8.00000 | RARITY: T6_EPIC | CAT: trophy
+PRICE | ID: minecraft:zombie_head | RATIO: 1 = 8 DIA | UNIT_DIA: 8.00000 | RARITY: T6_EPIC | CAT: trophy
+PRICE | ID: minecraft:creeper_head | RATIO: 1 = 8 DIA | UNIT_DIA: 8.00000 | RARITY: T6_EPIC | CAT: trophy
+PRICE | ID: minecraft:piglin_head | RATIO: 1 = 10 DIA | UNIT_DIA: 10.00000 | RARITY: T6_EPIC | CAT: trophy
+# ==============================================================================
+# END OF AGENT VALUATION INDEX
+# ==============================================================================

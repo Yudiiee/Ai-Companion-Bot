@@ -1,0 +1,5 @@
+name: town plaza
+aliases: plaza, town square, square, fountain
+about: A paved 15x15 square with a fountain and lamp posts: the middle of the companions' town.
+ground: 1
+front: south

@@ -57,7 +57,7 @@ public final class HumanChatListener {
     // Commands understood locally
     // ------------------------------------------------------------------------
 
-    public enum Local { FOLLOW, STAY, WANDER, COME, GIVE, INVENTORY, CRAFT, PVP, DIG, STRIP, COLLECT, FARM, ORE, WOOD, MINE, PLAY, STOP, HOUSE, CHEST, TAKE, STORE, HOME, CHESTS, BLUEPRINT, TREE, RECIPE, MAKE, SMALL_TALK }
+    public enum Local { FOLLOW, STAY, WANDER, COME, GIVE, INVENTORY, CRAFT, PVP, DIG, STRIP, COLLECT, FARM, ORE, WOOD, MINE, PLAY, STOP, HOUSE, CHEST, TAKE, STORE, HOME, CHESTS, BLUEPRINT, TREE, RECIPE, MAKE, PRICE, TRADE, DEAL, CITY, SMALL_TALK }
 
     private static final Pattern FOLLOW = Pattern.compile("\\b(follow me|come with me|let'?s go|stick with me|tag along)\\b");
     private static final Pattern STAY = Pattern.compile("\\b(stay here|stay there|stay put|wait here|wait there|stop following|don'?t move|stop moving)\\b");
@@ -84,16 +84,26 @@ public final class HumanChatListener {
      * Also used by the client-side path so the same message isn't sent to the LLM twice.
      */
     public static Local classifyLocal(String message, String botName) {
+        return classifyLocal(message, botName, true);
+    }
+
+    /** {@code deals}: count "yes"/"no" as the answer to a price the bot quoted. */
+    static Local classifyLocal(String message, String botName, boolean deals) {
         String m = HumanReactions.normalise(message, botName);
         if (m.isEmpty()) return null;
         if (m.length() <= 60) {
+            // an answer to a price it just quoted
+            if (deals && Economy.hasPending(botName) && (Economy.isYes(m) || Economy.isNo(m))) return Local.DEAL;
             if (STAY.matcher(m).find()) return Local.STAY;
             if (STOP.matcher(m).find()) return Local.STOP;
             if (HOME.matcher(m).find()) return Local.HOME;
             if (CHESTS.matcher(m).find()) return Local.CHESTS;
             if (Storage.CHEST_HERE.matcher(m).find()) return Local.CHEST;
             if (Storage.parseTake(m) != null) return Local.TAKE;
+            if (Economy.on() && Economy.parse(m) != null) return Local.TRADE;
             if (Woods.isQuestion(m)) return Local.TREE;
+            if (PriceBook.question(m) != null && PriceBook.itemFor(PriceBook.question(m)) != null) return Local.PRICE;
+            if (City.parse(m, null, null) != null) return Local.CITY;
             if (RecipeBook.howTo(m) != null && RecipeBook.itemFor(RecipeBook.howTo(m)) != null) return Local.RECIPE;
             if (Blueprints.parse(m, null, null) != null) return Local.BLUEPRINT;
             if (House.request(m, null) != null) return Local.HOUSE;
@@ -147,6 +157,8 @@ public final class HumanChatListener {
                 && botName.equals(ConversationMemory.lastPartner(sender.getUUID()));
 
         Local local = classifyLocal(text, botName);
+        // "ok" while the bot is waiting on somebody else's answer to a price: not for this player
+        if (local == Local.DEAL && !Economy.hasPending(botName, sender.getUUID())) local = classifyLocal(text, botName, false);
         if (local != null) {
             engage(target, sender);
             handleLocal(server, target, sender, text, local);
@@ -264,6 +276,34 @@ public final class HumanChatListener {
                     // asking again doesn't start it over (that just threw away the progress)
                     HumanChat.say(server, botName, HumanChat.pick("already on it", "yep, working on it",
                             "on it, just getting everything ready first"));
+                    return;
+                }
+                SurvivalBrain.startJob(bot, req.label(), true, req.job());
+                HumanChat.say(server, botName, req.ack());
+            }
+            case DEAL -> {
+                String r = Economy.answerDeal(server, bot, sender, Economy.isYes(HumanReactions.normalise(text, botName)));
+                if (r != null) HumanChat.say(server, botName, r);
+            }
+            case TRADE -> {
+                String r = Economy.handle(server, bot, sender, Economy.parse(HumanReactions.normalise(text, botName)));
+                if (r != null) HumanChat.say(server, botName, r);
+            }
+            case PRICE -> {
+                String a = PriceBook.answer(PriceBook.question(HumanReactions.normalise(text, botName)));
+                HumanChat.say(server, botName, a != null ? a : "no idea what that's worth");
+            }
+            case CITY -> {
+                Blueprints.Ask a = City.parse(HumanReactions.normalise(text, botName), sender, bot);
+                if (a == null) return;
+                if (a.job() == null) {
+                    String line = a.say() == null ? null : a.say().get();
+                    if (line != null && !line.isBlank()) HumanChat.say(server, botName, line);
+                    return;
+                }
+                MiningSkills.Request req = a.job();
+                if (req.label().equals(SurvivalBrain.jobName(bot))) {
+                    HumanChat.say(server, botName, HumanChat.pick("already on it", "yep, working on it"));
                     return;
                 }
                 SurvivalBrain.startJob(bot, req.label(), true, req.job());

@@ -49,6 +49,10 @@ public final class HumanConfig {
         public boolean autoStore = true;
         /** Builds itself a base (a small house with a chest) and lives there: loot goes home, it goes home at night. */
         public boolean autoHome = true;
+        /** Once everyone has a house, the companions found a town together and build it (plaza, roads, shops, temple...). */
+        public boolean autoCity = true;
+        /** Diamonds are money: the companions keep theirs, sell and buy at the price list, run shops. */
+        public boolean economy = true;
     }
 
     private HumanConfig() {}

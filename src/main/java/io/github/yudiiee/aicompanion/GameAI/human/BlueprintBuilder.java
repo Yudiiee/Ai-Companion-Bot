@@ -975,6 +975,12 @@ final class BlueprintBuilder {
             Storage.withdraw(server, bot, b, itemTest(e.getKey()), e.getValue(), label(e.getKey()));
         }
         missing = onServer(server, () -> shortfall(bot, needs), missing);
+        // what isn't in the chests might be for sale in somebody's shop
+        for (Map.Entry<String, Integer> e : new ArrayList<>(missing.entrySet())) {
+            if (!SurvivalBrain.canContinue(b)) break;
+            Economy.buyFromShops(server, bot, b, itemTest(e.getKey()), e.getKey(), e.getValue());
+        }
+        missing = onServer(server, () -> shortfall(bot, needs), missing);
         for (Map.Entry<String, Integer> e : new ArrayList<>(missing.entrySet())) {
             if (!SurvivalBrain.canContinue(b)) break;
             String item = e.getKey();
@@ -1570,7 +1576,7 @@ final class BlueprintBuilder {
      * Items a build uses (stand-ins included): kept out of crafting and the chests while it's
      * going. Re-read from the plan each time, so stand-ins agreed later are kept too.
      */
-    private static Predicate<String> keepFor(Placed p) {
+    static Predicate<String> keepFor(Placed p) {
         Set<String> items = ConcurrentHashMap.newKeySet();
         Runnable fill = () -> {
             Set<String> now = new HashSet<>(List.of("bucket", "water_bucket", "lava_bucket"));
@@ -1626,6 +1632,12 @@ final class BlueprintBuilder {
     /** Same, telling the caller how it went (null if it never started). Job thread. */
     static Result buildFor(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, Blueprints.Entry e, Spot spot,
                            Blueprints.Build previous) throws InterruptedException {
+        return buildFor(server, bot, b, e, spot, previous, null);
+    }
+
+    /** {@code recordAs}: whose build it goes down as ("town" for the town's), else the bot's own. */
+    static Result buildFor(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, Blueprints.Entry e, Spot spot,
+                           Blueprints.Build previous, String recordAs) throws InterruptedException {
         Schematic base;
         try {
             base = Blueprints.plan(e);
@@ -1658,7 +1670,7 @@ final class BlueprintBuilder {
             p.swaps().putAll(decodeSwaps(previous.swaps()));
             upgradeStandIns(server, bot, b, p);
         }
-        String me = b.name.toLowerCase(Locale.ROOT);
+        String me = recordAs != null ? recordAs : b.name.toLowerCase(Locale.ROOT);
         Blueprints.Build rec = new Blueprints.Build(previous != null ? previous.bot() : me, p.dim(), e.fileName(),
                 p.origin().getX(), p.origin().getY(), p.origin().getZ(), p.rot(), p.plan().sx, p.plan().sy, p.plan().sz, false,
                 encodeSwaps(p.swaps()));
@@ -1927,8 +1939,10 @@ final class BlueprintBuilder {
         BlockPos at = onServer(server, bot::blockPosition, null);
         if (at == null) return false;
         for (Blueprints.Build rec : Blueprints.builds()) {
-            if (!rec.done() || !rec.bot().equals(me) || !rec.dim().equals(dim)) continue;
+            boolean town = rec.bot().equals(City.TOWN_BUILDER); // the town's farms: whoever's around tends them
+            if (!rec.done() || !(rec.bot().equals(me) || town) || !rec.dim().equals(dim)) continue;
             if (rec.center().distSqr(at) > 160 * 160) continue;
+            if (town && !City.tendClaim(rec, me)) continue; // somebody else is on it
             Placed p;
             try {
                 p = placedOf(rec);
@@ -1938,12 +1952,26 @@ final class BlueprintBuilder {
             List<int[]> cells = plantCells(p, rec);
             if (cells.isEmpty()) continue;
             int ready = onServer(server, () -> harvestable(bot.level(), p, cells).size(), 0);
-            if (ready < Math.max(4, cells.size() / 3)) continue;
+            // the town's farms also get planted up when a lot of it is bare (and there are seeds to do it)
+            int bare = town ? onServer(server, () -> bare(bot.level(), p, cells), 0) : 0;
+            boolean plant = bare >= 8 && onServer(server, () -> Gathering.countOf(bot, it -> it.endsWith("_seeds")
+                    || it.equals("carrot") || it.equals("potato")) + Storage.stockOf(bot.level(), "wheat_seeds"::equals) > 0, false);
+            if (ready < Math.max(4, cells.size() / 3) && !plant) continue;
             SurvivalBrain.maybeSay(server, b, HumanChat.pick("gonna go harvest the " + rec.name(), "the " + rec.name() + " needs harvesting"), 0.7);
             tend(server, bot, b, rec, false);
             return true;
         }
         return false;
+    }
+
+    /** Plant cells with nothing growing in them. Server thread. */
+    static int bare(ServerLevel level, Placed p, List<int[]> cells) {
+        int n = 0;
+        for (int[] c : cells) {
+            BlockPos q = p.world(c[0], c[1], c[2]);
+            if (level.isLoaded(q) && level.getBlockState(q).isAir()) n++;
+        }
+        return n;
     }
 
     /** For the tests: which items a design takes, per item. */

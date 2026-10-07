@@ -1,0 +1,5 @@
+name: shop
+aliases: market stall, store, stall
+about: A market stall: stock chests along the back, a counter with the till (the barrel) at the front.
+ground: 0
+front: south

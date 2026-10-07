@@ -1,0 +1,5 @@
+name: warehouse
+aliases: storehouse, town storage, depot
+about: A stone shed full of chests: the town's shared storage.
+ground: 0
+front: south

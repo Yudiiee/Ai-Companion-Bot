@@ -356,6 +356,8 @@ public final class Home {
         }
         // starving with nothing on it: the farm, if there's anything ripe
         if (n.food() <= 6 && !n.hasFood() && n.overworld() && Farm.feedYourself(server, bot, b)) return true;
+        // nothing ripe either: buy something to eat at one of the others' shops
+        if (n.food() <= 6 && !n.hasFood() && Economy.buyFood(server, bot, b)) return true;
         boolean willHeal = hurt && n.food() >= 18;
 
         boolean canGoHome = now >= SKIP_HOME_UNTIL.getOrDefault(who(bot), 0L);
@@ -393,6 +395,8 @@ public final class Home {
         if (!n.night() && n.overworld() && Farm.tick(server, bot, b)) return true;
         // and any farm it built from a schematic (cane, cactus, bamboo, crops)
         if (!n.night() && BlueprintBuilder.tick(server, bot, b)) return true;
+        // daytime: the town (the temple, the shop, the next piece of it, helping the others)
+        if (!n.night() && n.overworld() && City.tick(server, bot, b)) return true;
         if (n.dist() > 96 && canGoHome) {
             SurvivalBrain.maybeSay(server, b, HumanChat.pick("heading back to base", "going back home"), 0.5);
             if (!goHome(server, bot, b)) SKIP_HOME_UNTIL.put(who(bot), System.currentTimeMillis() + 3 * 60_000L);

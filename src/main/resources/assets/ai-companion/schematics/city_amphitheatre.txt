@@ -1,0 +1,5 @@
+name: amphitheatre
+aliases: amphitheater, theatre, theater, arena, stage
+about: A stage with half a ring of stone seats rising away from it.
+ground: 0
+front: south

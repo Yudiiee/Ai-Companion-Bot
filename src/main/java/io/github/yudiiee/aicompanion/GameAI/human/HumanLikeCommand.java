@@ -49,6 +49,8 @@ public final class HumanLikeCommand {
             root.then(toggle("statuslines", d -> !d.hideRobotStatusLines, (d, v) -> d.hideRobotStatusLines = !v));
             root.then(toggle("store", d -> d.autoStore, (d, v) -> d.autoStore = v));
             root.then(toggle("home", d -> d.autoHome, (d, v) -> d.autoHome = v));
+            root.then(toggle("city", d -> d.autoCity, (d, v) -> d.autoCity = v));
+            root.then(toggle("economy", d -> d.economy, (d, v) -> d.economy = v));
             root.then(Commands.literal("reload").executes(ctx -> {
                 HumanConfig.load();
                 reply(ctx, "Reloaded human-like settings.");
@@ -97,7 +99,9 @@ public final class HumanLikeCommand {
                 + ", smalltalk=" + onOff(d.idleChatter)
                 + ", statuslines=" + onOff(!d.hideRobotStatusLines)
                 + ", store=" + onOff(d.autoStore)
-                + ", home=" + onOff(d.autoHome));
+                + ", home=" + onOff(d.autoHome)
+                + ", city=" + onOff(d.autoCity)
+                + ", economy=" + onOff(d.economy));
         return 1;
     }
 

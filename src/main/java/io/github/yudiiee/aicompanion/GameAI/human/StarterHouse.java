@@ -88,7 +88,7 @@ final class StarterHouse {
         }
         for (Blueprints.Build b : Blueprints.builds()) {
             Blueprints.Entry e = Blueprints.byFile(b.file());
-            if (e != null && e.starter() && !b.bot().equals(me)) taken.add(b.file());
+            if (e != null && e.starter() && !b.bot().equals(me) && !b.bot().equals(City.TOWN_BUILDER)) taken.add(b.file());
         }
         for (Blueprints.Entry e : all) if (!taken.contains(e.fileName())) return e;
         return all.get(Math.floorMod(me.hashCode(), all.size()));
