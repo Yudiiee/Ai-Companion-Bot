@@ -238,6 +238,10 @@ public class CompanionController {
         ServerPlayer bot = resolveBot(botName);
         if (bot == null || target == null) return;
         BlockPos goal = target.blockPosition();
+        try { // a flying / jumping player: meet them on the ground below, not in mid-air
+            goal = io.github.yudiiee.aicompanion.GameAI.human.Surface.groundBelow(
+                    (net.minecraft.server.level.ServerLevel) target.level(), goal);
+        } catch (Exception ignored) { }
         BlockPos previous = followGoal.get(botName);
         if (!dig && io.github.yudiiee.aicompanion.GameAI.human.BotPathing.isActive(bot.getUUID())
                 && previous != null && previous.distSqr(goal) < 16) {

@@ -417,7 +417,8 @@ public final class MiningSkills {
         int got = 0, misses = 0;
         if (t.tier() > 0 && !ensurePickaxe(server, bot, b, t.tier())) return;
         // gather around where it started, like a player: not tree after tree off into the distance
-        final BlockPos origin = onServer(server, bot::blockPosition, null);
+        BlockPos origin = onServer(server, bot::blockPosition, null);
+        int farTrips = 0;
         String toolKind = toolKindFor(t);
         boolean announced = false;
         int lastToolCheck = -1;
@@ -442,6 +443,16 @@ public final class MiningSkills {
             boolean farOre = cand != null && t.stripY() != null && onServer(server, () -> !SurvivalBrain.exposed(bot.level(), cand)
                     || cand.distSqr(bot.blockPosition()) > 16 * 16, true);
             final BlockPos target = farOre ? null : cand;
+            if (target == null && t.logs() && farTrips < 5) {
+                // none in this neighbourhood: go and find some, like a player would (other species too)
+                farTrips++;
+                if (farTrips == 1) say(server, b, HumanChat.pick("no " + t.label() + " around here, gonna go look further out",
+                        "none nearby, heading out to find some"));
+                if (travelToTrees(server, bot, b, t)) {
+                    origin = onServer(server, bot::blockPosition, null);
+                    continue;
+                }
+            }
             if (target == null) {
                 if (t.stripY() != null) {
                     say(server, b, HumanChat.pick("no " + t.label() + " in sight, heading down the mine for some",
@@ -489,6 +500,82 @@ public final class MiningSkills {
             say(server, b, HumanChat.pick("got " + got + " " + t.label(), "ok that's " + got + " " + t.label(),
                     "done, " + got + " " + t.label()));
         }
+    }
+
+    private static final String[] SPECIES = {"oak", "spruce", "birch", "jungle", "acacia", "dark_oak", "mangrove", "cherry", "pale_oak"};
+
+    /** Leaf blocks of the species this target wants (all of them for plain "wood"). */
+    static java.util.Set<String> wantedLeaves(Target t) {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        for (String sp : SPECIES) if (t.test(sp + "_log")) out.add(sp + "_leaves");
+        return out;
+    }
+
+    /**
+     * The nearest tree of the wanted species beyond the usual search, found by its leaves in
+     * rings out to 160 blocks (loaded chunks only). Returns a standing spot at its foot, or null.
+     */
+    static BlockPos findTreesFar(MinecraftServer server, ServerPlayer bot, Target t) {
+        java.util.Set<String> leaves = wantedLeaves(t);
+        if (leaves.isEmpty()) return null;
+        for (int r = 40; r < 160; r += 20) {
+            final int r0 = r, r1 = r + 20;
+            BlockPos hit = onServer(server, () -> {
+                ServerLevel level = bot.level();
+                BlockPos o = bot.blockPosition();
+                BlockPos best = null;
+                double bd = Double.MAX_VALUE;
+                for (int dx = -r1; dx <= r1; dx += 4) for (int dz = -r1; dz <= r1; dz += 4) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) < r0) continue;
+                    double d2 = dx * dx + dz * dz;
+                    if (d2 >= bd) continue;
+                    if (!level.isLoaded(o.offset(dx, 0, dz))) continue;
+                    for (int dy = 28; dy >= -28; dy -= 2) {
+                        BlockPos p = o.offset(dx, dy, dz);
+                        if (!leaves.contains(blockPath(level.getBlockState(p)))) continue;
+                        // down to the ground under the canopy
+                        BlockPos q = p;
+                        for (int k = 0; k < 40; k++) {
+                            BlockPos below = q.below();
+                            String bp = blockPath(level.getBlockState(below));
+                            if (Building.isSolid(level, below) && !bp.endsWith("_leaves") && !bp.endsWith("_log")) break;
+                            q = below;
+                        }
+                        if (Protection.nearManMade(level, q, 3)) break;
+                        best = q;
+                        bd = d2;
+                        break;
+                    }
+                }
+                return best;
+            }, null);
+            if (hit != null) return hit;
+        }
+        return null;
+    }
+
+    /** Walks out (in legs) to the nearest wanted trees. True if it got there. Job thread. */
+    static boolean travelToTrees(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, Target t)
+            throws InterruptedException {
+        BlockPos dest = findTreesFar(server, bot, t);
+        if (dest == null) return false;
+        for (int leg = 0; leg < 10 && SurvivalBrain.canContinue(b); leg++) {
+            BlockPos here = onServer(server, bot::blockPosition, null);
+            if (here == null) return false;
+            double dx = dest.getX() - here.getX(), dz = dest.getZ() - here.getZ();
+            double dist = Math.sqrt(dx * dx + dz * dz);
+            if (dist <= 24) return true;
+            if (!upkeep(server, bot, b)) return false;
+            BlockPos next = dist <= 40 ? dest
+                    : new BlockPos(here.getX() + (int) (dx / dist * 32), here.getY(), here.getZ() + (int) (dz / dist * 32));
+            BotPathing.Options o = BotPathing.Options.walkOnly();
+            o.allowPlace = true;
+            o.timeoutTicks = 20 * 60;
+            BotPathing.goToBlocking(bot, ActionPathfinder.near(next.getX(), next.getY(), next.getZ(), next == dest ? 3 : 10),
+                    o, 63_000L);
+        }
+        BlockPos end = onServer(server, bot::blockPosition, null);
+        return end != null && Math.hypot(dest.getX() - end.getX(), dest.getZ() - end.getZ()) <= 40;
     }
 
     /** Nearest matching block, searching outward in shells; exposed ones are preferred. (server thread) */
@@ -539,9 +626,12 @@ public final class MiningSkills {
         // action-based A*: walks, jumps, drops, tunnels, pillars and bridges as needed
         BotPathing.Options o = logs ? BotPathing.Options.walkOnly() : BotPathing.Options.full();
         o.timeoutTicks = 20 * 90;
-        BotPathing.goToBlocking(bot, ActionPathfinder.reach(target.getX(), target.getY(), target.getZ(), REACH - 0.2),
-                o, 95_000L);
-        if (inReach(server, bot, target)) return true;
+        boolean high = logs && onServer(server, () -> target.getY() - bot.getY() > 4.5, false);
+        if (!high) {
+            BotPathing.goToBlocking(bot, ActionPathfinder.reach(target.getX(), target.getY(), target.getZ(), REACH - 0.2),
+                    o, 95_000L);
+            if (inReach(server, bot, target)) return true;
+        }
         if (logs) {
             // a tall tree: pillar up next to it like a player would
             o = BotPathing.Options.full();
@@ -690,11 +780,22 @@ public final class MiningSkills {
         BlockPos base = logs.get(0);
         String species = onServer(server, () -> blockPath(bot.level().getBlockState(base)), "oak_log");
         int chopped = 0, failed = 0;
+        int top = logs.get(logs.size() - 1).getY() - base.getY() + 1;
+        if (top > 4) {
+            // a tall tree: pillar blocks (dirt will do) to get at the top, like a player carries
+            int need = Math.min(top - 2, 10);
+            int have = onServer(server, () -> LevelPathWorld.countThrowaway(bot), 0);
+            if (have < need) {
+                maybeSay(server, b, HumanChat.pick("tall one, need some dirt to climb it", "grabbing dirt to get up that tree"));
+                collect(server, bot, b, new Target("dirt", p -> p.equals("dirt") || p.equals("grass_block") || p.equals("coarse_dirt"),
+                        false, true, 0, 8, null), need - have + 2, true);
+            }
+        }
         for (BlockPos log : logs) {
             if (!SurvivalBrain.canContinue(b)) break;
             if (!onServer(server, () -> SurvivalBrain.isLog(bot.level().getBlockState(log)), false)) continue;
             if (!reach(server, bot, b, log, true) || !dig(server, bot, b, log, false, 0)) {
-                if (++failed >= 4) break; // way out of reach: leave the rest
+                if (++failed >= 8) break; // way out of reach: leave the rest
                 continue;
             }
             chopped++;
@@ -1039,10 +1140,21 @@ public final class MiningSkills {
     }
 
     /** Makes sure there's a pickaxe of at least {@code minTier}, getting wood/stone for one if needed. */
+    private static void craftPick(MinecraftServer server, ServerPlayer bot) {
+        onServer(server, () -> {
+            SurvivalBrain.craftNow(bot);
+            if (SurvivalBrain.Inv.of(bot).pickaxeTier() == 0
+                    || SurvivalBrain.Inv.of(bot).pickaxeTier() == 1 && SurvivalBrain.Inv.of(bot).cobble() >= 3) {
+                SurvivalBrain.craftTool(bot, "pickaxe"); // ignores "keep the wood for a build"
+            }
+            return null;
+        }, null);
+    }
+
     static boolean ensurePickaxe(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, int minTier)
             throws InterruptedException {
         if (pickTier(server, bot) >= minTier) return true;
-        onServer(server, () -> SurvivalBrain.craftNow(bot), null);
+        craftPick(server, bot);
         if (pickTier(server, bot) >= minTier) return true;
         if (minTier >= 4) {
             say(server, b, HumanChat.pick("need a diamond pickaxe for that", "can't mine that without a diamond pick"));
@@ -1055,12 +1167,12 @@ public final class MiningSkills {
         if (pickTier(server, bot) == 0) {
             say(server, b, HumanChat.pick("need a pickaxe first, gonna grab some wood", "no pickaxe yet, getting wood first"));
             collect(server, bot, b, logs("wood", MiningSkills::isNaturalLogId), 4);
-            onServer(server, () -> SurvivalBrain.craftNow(bot), null);
+            craftPick(server, bot);
         }
         if (minTier >= 2 && pickTier(server, bot) == 1) {
             say(server, b, HumanChat.pick("need a stone pick for that, one sec", "gonna get some stone for a better pick"));
             collect(server, bot, b, new Target("stone", "stone"::equals, false, true, 1, 3, null), 3);
-            onServer(server, () -> SurvivalBrain.craftNow(bot), null);
+            craftPick(server, bot);
         }
         if (pickTier(server, bot) >= minTier) return true;
         if (SurvivalBrain.canContinue(b)) say(server, b, HumanChat.pick("couldn't make a good enough pickaxe", "need a better pickaxe for that"));

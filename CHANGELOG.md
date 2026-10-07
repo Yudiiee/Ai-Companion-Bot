@@ -1,5 +1,17 @@
 # AI Companion - Changelog
 
+## 1.8.1 (Minecraft 26.3)
+
+- Commands win: the language model's plan steps no longer cancel a walk you asked for, the rest after "stop"/"come",
+  or a job the bot is already doing. They wait until the bot is idle.
+- "come" works when you're flying or jumping: the bot walks to the ground under you instead of a spot in mid-air.
+- Pickaxe deadlock fixed: wood held back for a house build no longer stops a bot with no pickaxe from making one
+  (so mining and the shared mine can start).
+- Trees: when none are in the usual search, the bot looks out to 160 blocks for the wanted species (oak, spruce,
+  birch, jungle, acacia, dark oak, mangrove, cherry, pale oak) by their leaves, walks out in legs and carries on there.
+- Whole trees: tall trees are felled to the top. The bot first gathers dirt to pillar with, goes straight to
+  pillaring for logs high above it, and puts up with more failed reaches before giving up on a tree.
+
 ## 1.8.0 (Minecraft 26.3)
 
 - The ore index: every companion remembers where each ore generates in 26.3 (y range, best level, biome, how it's

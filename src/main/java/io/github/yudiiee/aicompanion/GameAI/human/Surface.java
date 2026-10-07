@@ -41,6 +41,18 @@ public final class Surface {
         return false;
     }
 
+    /** The standing spot under {@code p} when the player is in the air (flying, jumping, bridging); else {@code p}. */
+    public static net.minecraft.core.BlockPos groundBelow(net.minecraft.server.level.ServerLevel level,
+                                                          net.minecraft.core.BlockPos p) {
+        for (int d = 1; d <= 64; d++) {
+            net.minecraft.core.BlockPos under = new net.minecraft.core.BlockPos(p.getX(), p.getY() - d, p.getZ());
+            if (Building.isSolid(level, under)) {
+                return d == 1 ? p : new net.minecraft.core.BlockPos(p.getX(), p.getY() - d + 1, p.getZ());
+            }
+        }
+        return p;
+    }
+
     /** Following someone who is well above while it's in a mine: it needs to dig/pillar, not just walk. */
     public static boolean needsToDigUp(ServerPlayer bot, ServerPlayer target) {
         if (bot == null || target == null || bot.level() != target.level()) return false;

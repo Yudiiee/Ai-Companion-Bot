@@ -307,7 +307,8 @@ public class AutonomousGoalEngine {
         // Goals the built-in survival brain can carry out directly (wood, stone, ores,
         // crafting, exploring) run there; HybridPlanner needs RL state from training mode.
         ServerPlayer brainBot = resolveBot();
-        if (brainBot != null && io.github.yudiiee.aicompanion.GameAI.human.SurvivalBrain.runGoalText(brainBot, entry.goalText(), 90_000L)) {
+        if (brainBot != null && io.github.yudiiee.aicompanion.GameAI.human.SurvivalBrain.runGoalText(brainBot, entry.goalText(), 90_000L,
+                entry.source() == io.github.yudiiee.aicompanion.GameAI.autonomous.GoalQueueEntry.Source.LLM_PLAN)) {
             return;
         }
 

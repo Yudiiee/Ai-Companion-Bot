@@ -165,7 +165,26 @@ public final class SurvivalBrain {
      * waits for it (up to {@code maxMillis}). Returns false if the text isn't understood.
      */
     public static boolean runGoalText(ServerPlayer bot, String goal, long maxMillis) {
+        return runGoalText(bot, goal, maxMillis, false);
+    }
+
+    /** True when the model's plan must not start something now (a command, rest, job or walk is on). */
+    static boolean planBlocked(ServerPlayer bot) {
+        if (CompanionController.getInstance().getStance(bot.getName().getString()) != BotStance.WANDER) return true;
+        if (BotPathing.isActive(bot.getUUID())) return true;
+        Brain b = BRAINS.get(bot.getUUID());
+        if (b == null) return false;
+        return b.job != null || b.commanded != null || b.runningSeq != -1
+                || System.currentTimeMillis() < b.restUntil;
+    }
+
+    public static boolean runGoalText(ServerPlayer bot, String goal, long maxMillis, boolean fromPlan) {
         String g = goal == null ? "" : goal.toLowerCase(Locale.ROOT);
+        if (fromPlan && planBlocked(bot)) {
+            // The model's plan never cancels a command, a rest or the bot's own job; wait, then ask again.
+            try { Thread.sleep(4000); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            return true;
+        }
 
         // "build a shelter", "store items in the chest": real jobs
         MiningSkills.Request special = House.request(g, null);
@@ -922,8 +941,9 @@ public final class SurvivalBrain {
 
     static String craftUpgrades(ServerPlayer bot) {
         Predicate<String> keep = KEEP.getOrDefault(bot.getUUID(), p -> false);
-        if (keep.test("oak_log") || keep.test("oak_planks") || keep.test("stick")) return null; // wood is for someone
         Inv inv = Inv.of(bot);
+        // wood is for someone - but never at the price of having no pickaxe at all
+        if (inv.pickaxeTier > 0 && (keep.test("oak_log") || keep.test("oak_planks") || keep.test("stick"))) return null;
         boolean wantsTools = inv.pickaxeTier < 2 || !inv.sword
                 || (inv.pickaxeTier >= 2 && (inv.axeTier < 2 || inv.shovelTier < 2));
 

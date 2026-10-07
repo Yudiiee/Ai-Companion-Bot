@@ -160,6 +160,15 @@ public class HumanTest {
             }
             check(inside, "8 wall torches, inside, on walls, clear of windows and door");
         }
+        try {
+            Method wl = MiningSkills.class.getDeclaredMethod("wantedLeaves", MiningSkills.Target.class);
+            wl.setAccessible(true);
+            var any = (java.util.Set<?>) wl.invoke(null, MiningSkills.resolve("wood"));
+            check(any.contains("dark_oak_leaves") && any.contains("spruce_leaves") && any.contains("jungle_leaves") && any.contains("birch_leaves"),
+                    "wood searches every species: " + any);
+            var dark = MiningSkills.resolve("dark oak logs");
+            if (dark != null) { var d = (java.util.Set<?>) wl.invoke(null, dark); check(d.contains("dark_oak_leaves") && !d.contains("spruce_leaves"), "dark oak only: " + d); }
+        } catch (Exception e) { fails++; System.out.println("FAIL: wantedLeaves " + e); }
         System.out.println(fails == 0 ? "ALL PASSED" : fails + " FAILED");
         System.exit(fails);
     }
