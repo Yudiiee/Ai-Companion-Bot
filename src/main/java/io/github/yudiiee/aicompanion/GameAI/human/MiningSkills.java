@@ -325,20 +325,27 @@ public final class MiningSkills {
         String ack = HumanChat.pick("ok, getting " + what, "sure, " + what + " coming up", "on it, " + what,
                 "bet, gonna get " + what);
         return new Request("collect " + what, ack, (server, bot, b) -> {
-            if (deliverTo != null) SurvivalBrain.keep(bot, Gathering.itemsFor(t)); // don't craft it away
+            SurvivalBrain.keep(bot, Gathering.itemsFor(t)); // neither crafted away nor put in the depot before it's done
             try {
                 int toMine = count;
-                if (deliverTo != null) {
-                    // for someone: what's in the pockets and the chests counts before going out to mine
-                    int have = onServer(server, () -> Gathering.countOf(bot, Gathering.itemsFor(t)), 0);
-                    int fromChest = Storage.withdraw(server, bot, b, Gathering.itemsFor(t), count - have, t.label());
+                if (!t.label().equals("ores")) {
+                    // what's in the pockets and the chests counts before going out to mine (not mining what it holds)
+                    Predicate<String> mineItems = Gathering.itemsFor(t);
+                    int have = onServer(server, () -> Gathering.countOf(bot, mineItems), 0);
+                    int fromChest = have >= count ? 0 : Storage.withdraw(server, bot, b, mineItems, count - have, t.label());
                     toMine = count - have - fromChest;
+                    if (toMine <= 0 && deliverTo == null) {
+                        say(server, b, HumanChat.pick("already have " + (have + fromChest) + " " + t.label() + " on me",
+                                "got enough " + t.label() + " already, " + (have + fromChest)));
+                        SurvivalBrain.sleep(3000);
+                    }
                 }
                 if (toMine > 0) collect(server, bot, b, t, toMine, deliverTo != null);
                 if (deliverTo != null && SurvivalBrain.canContinue(b)) {
                     Gathering.deliver(server, bot, b, deliverTo, Gathering.itemsFor(t), t.label(),
                             Gathering.oneToOne(t) ? count : 0);
                 } else if (deliverTo == null && SurvivalBrain.canContinue(b)) {
+                    SurvivalBrain.keep(bot, null); // done: the haul can go in the depot now
                     Surface.backUp(server, bot, b, null);
                     Storage.afterMining(server, bot, b);
                 }
@@ -1188,12 +1195,28 @@ public final class MiningSkills {
      * stack, dirt, gravel, diorite, tuff, seeds, flowers...) and carry on. Only if it's all
      * worth keeping is it really full. Job thread.
      */
-    static boolean pocketsFull(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b) {
-        return onServer(server, () -> {
+    static boolean pocketsFull(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b) throws InterruptedException {
+        boolean full = onServer(server, () -> {
             if (!inventoryFull(bot)) return false;
             Storage.makeRoom(bot, 4);
             return inventoryFull(bot);
         }, false);
+        if (!full || !HumanConfig.get().autoStore || System.currentTimeMillis() < Depot.failUntil
+                || !SurvivalBrain.canContinue(b)) return full;
+        // pockets full of stuff worth keeping: take it to the depot, then carry on where it was
+        BlockPos back = onServer(server, bot::blockPosition, null);
+        maybeSay(server, b, HumanChat.pick("pockets are full, dropping it all at the depot", "gotta unload at the depot, back in a bit"));
+        int moved = Depot.unload(server, bot, b, false);
+        if (moved > 0 && back != null && SurvivalBrain.canContinue(b)) {
+            BotPathing.Options o = BotPathing.Options.full();
+            o.timeoutTicks = 20 * 150;
+            BotPathing.goToBlocking(bot, ActionPathfinder.near(back.getX(), back.getY(), back.getZ(), 2.0), o, 155_000L);
+        }
+        return onServer(server, () -> {
+            if (!inventoryFull(bot)) return false;
+            Storage.makeRoom(bot, 3);
+            return inventoryFull(bot);
+        }, true);
     }
 
     /**

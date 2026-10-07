@@ -35,7 +35,7 @@ public final class Gathering {
         return p -> {
             if (p.isEmpty()) return false;
             if (t.test(p)) return true; // sand, gravel, logs, dirt... drop themselves
-            if (t.logs()) return SurvivalBrain.isLogItem(p);
+            if (t.logs()) return (label.equals("wood") || label.equals("logs")) && SurvivalBrain.isLogItem(p);
             return switch (label) {
                 case "coal" -> p.equals("coal");
                 case "iron" -> p.equals("raw_iron");

@@ -820,21 +820,52 @@ final class MineHub {
         return best;
     }
 
+    /** Another player standing in this step (or the head room above it)? Server thread. */
+    private static boolean occupied(ServerPlayer bot, BlockPos c) {
+        for (ServerPlayer o : bot.level().getServer().getPlayerList().getPlayers()) {
+            if (o == bot || o.level() != bot.level()) continue;
+            double dx = o.getX() - (c.getX() + 0.5), dz = o.getZ() - (c.getZ() + 0.5);
+            double dy = o.getY() - c.getY();
+            if (Math.hypot(dx, dz) < 0.95 && dy > -1.2 && dy < 2.2) return true;
+        }
+        return false;
+    }
+
     /** Walks cell to cell with the movement keys (the stairs, a tunnel). Job thread. */
     static boolean walkCells(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, List<BlockPos> cells)
             throws InterruptedException {
+        long waitBudget = System.currentTimeMillis() + 75_000L; // all the waiting for others on this walk
         for (BlockPos c : cells) {
-            if (!SurvivalBrain.canContinue(b)) return false;
-            if (MiningSkills.at(server, bot, c)) continue;
-            // fallen gravel/sand, or a block it put there itself: dig it (tunnel rules: never fluids or builds)
-            for (BlockPos in : new BlockPos[]{c, c.above()}) {
-                if (onServer(server, () -> Building.isSolid(bot.level(), in), false)) { // (torches don't get in the way)
-                    MiningSkills.dig(server, bot, b, in, true, 0);
+            boolean ok = false;
+            for (int attempt = 0; attempt < 5 && !ok; attempt++) {
+                if (!SurvivalBrain.canContinue(b)) return false;
+                if (MiningSkills.at(server, bot, c)) { ok = true; break; }
+                // somebody else on the one-wide stairs (the others use them too): let them get by
+                long until = Math.min(System.currentTimeMillis() + 40_000L, waitBudget);
+                boolean waited = false;
+                while (onServer(server, () -> occupied(bot, c), false) && System.currentTimeMillis() < until
+                        && SurvivalBrain.canContinue(b)) {
+                    if (!waited) {
+                        waited = true;
+                        SurvivalBrain.maybeSay(server, b, HumanChat.pick("someone's on the stairs, waiting", "after you"), 0.4);
+                    }
+                    SurvivalBrain.sleep(1500);
                 }
+                // fallen gravel/sand, or a block it put there itself: dig it (tunnel rules: never fluids or builds)
+                for (BlockPos in : new BlockPos[]{c, c.above()}) {
+                    if (onServer(server, () -> Building.isSolid(bot.level(), in), false)) { // (torches don't get in the way)
+                        MiningSkills.dig(server, bot, b, in, true, 0);
+                    }
+                }
+                int fy = onServer(server, () -> BotPathing.feet(bot).getY(), c.getY());
+                ok = MiningSkills.walkInto(server, bot, c, c.getY() > fy) || MiningSkills.returnTo(server, bot, c);
+                if (!ok && attempt >= 2) {
+                    // the movement keys didn't do it: let the pathfinder take the step
+                    ok = SurvivalBrain.goTo(bot, c, 15, true) && MiningSkills.at(server, bot, c);
+                }
+                if (!ok) SurvivalBrain.sleep(1200L + 900L * attempt);
             }
-            int fy = onServer(server, () -> BotPathing.feet(bot).getY(), c.getY());
-            if (MiningSkills.walkInto(server, bot, c, c.getY() > fy)) continue;
-            if (!MiningSkills.returnTo(server, bot, c)) return false;
+            if (!ok) return false;
         }
         return true;
     }

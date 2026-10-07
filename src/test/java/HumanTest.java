@@ -169,6 +169,16 @@ public class HumanTest {
             var dark = MiningSkills.resolve("dark oak logs");
             if (dark != null) { var d = (java.util.Set<?>) wl.invoke(null, dark); check(d.contains("dark_oak_leaves") && !d.contains("spruce_leaves"), "dark oak only: " + d); }
         } catch (Exception e) { fails++; System.out.println("FAIL: wantedLeaves " + e); }
+        try {
+            Method cl = Class.forName("io.github.yudiiee.aicompanion.GameAI.human.BotTalkText").getDeclaredMethod("clean", String.class);
+            cl.setAccessible(true);
+            check("hey, got 40 logs".equals(cl.invoke(null, "<think>hmm they need logs</think>\n<Ovi> hey, got 40 logs")), "bot talk: thinking and name stripped");
+            check(cl.invoke(null, "[silent]") == null, "bot talk: [silent] says nothing");
+            check(cl.invoke(null, "<think>still thinking") == null, "bot talk: unfinished thinking says nothing");
+            String longLine = "word ".repeat(80);
+            String cut = (String) cl.invoke(null, longLine);
+            check(cut != null && cut.length() <= 170, "bot talk: long replies are cut: " + (cut == null ? 0 : cut.length()));
+        } catch (Exception e) { fails++; System.out.println("FAIL: bot talk clean " + e); }
         System.out.println(fails == 0 ? "ALL PASSED" : fails + " FAILED");
         System.exit(fails);
     }

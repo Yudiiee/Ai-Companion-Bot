@@ -130,6 +130,7 @@ public final class HumanChat {
                         "/say " + text);
             }
             ConversationMemory.recordBot(botName, text);
+            BotTalk.heard(server, botName, text);
         } catch (Exception e) {
             LOGGER.warn("[humanlike] failed to deliver chat line: {}", e.getMessage());
         }

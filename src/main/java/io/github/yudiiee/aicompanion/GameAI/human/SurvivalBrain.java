@@ -87,6 +87,7 @@ public final class SurvivalBrain {
         volatile long jobSeq = 0;
         volatile long runningSeq = -1;
         volatile long lastStore = 0;
+        int stockTick = 0;
         final Map<BlockPos, Long> blacklist = new ConcurrentHashMap<>();
         Thread thread;
         Brain(UUID id, String name) { this.id = id; this.name = name; }
@@ -387,14 +388,20 @@ public final class SurvivalBrain {
                 // 3a. Life at the base: build one, go home at night / when hurt, take the loot home
                 if (b.commanded == null && Home.tick(server, bot, b)) continue;
 
-                // 3b. Pockets nearly full: put the loot in the storage chest
+                // 3b. Pockets filling up: put the loot in the depot (the community chests)
                 if (HumanConfig.get().autoStore && System.currentTimeMillis() - b.lastStore > 120_000L
                         && System.currentTimeMillis() >= Storage.backoffUntil
-                        && onServer(server, () -> Storage.usedSlots(bot) >= 30 && Storage.canStoreSoon(bot), false)) {
+                        && onServer(server, () -> Storage.usedSlots(bot) >= 26 && Storage.storableSlots(bot) >= 6
+                                && Storage.canStoreSoon(bot), false)) {
                     b.lastStore = System.currentTimeMillis();
                     Storage.storeAll(server, bot, b, false);
                     continue;
                 }
+
+                // 3c. Count what it carries (for the others and for later), and help with what they're gathering
+                if (++b.stockTick % 3 == 0) onServer(server, () -> Stock.record(bot), null);
+                if (b.commanded == null && Depot.helpTick(server, bot, b)) continue;
+                BotTalk.maybeStart(server, bot, b);
 
                 // 4. Stay in the same area as the people you're playing with
                 BlockPos regroup = onServer(server, () -> regroupTarget(bot), null);

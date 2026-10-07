@@ -47,6 +47,12 @@ public final class HumanConfig {
         public double typingCharsPerSecond = 11.0;
         /** Put mined stuff away in the storage chest after a job and when its inventory fills up. */
         public boolean autoStore = true;
+        /** Companions help each other: gather for the depot when somebody needs something, chat with each other through the AI. */
+        public boolean teamwork = true;
+        /** Companions answer each other (and start conversations) through the language model. */
+        public boolean botChat = true;
+        /** Minutes between conversation starters from a companion with nothing to say. */
+        public int botChatMinMinutes = 3;
         /** Builds itself a base (a small house with a chest) and lives there: loot goes home, it goes home at night. */
         public boolean autoHome = true;
         /** Once everyone has a house, the companions found a town together and build it (plaza, roads, shops, temple...). */

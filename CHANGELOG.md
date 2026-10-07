@@ -1,5 +1,24 @@
 # AI Companion - Changelog
 
+## 1.9.0 (Minecraft 26.3)
+
+- Community depot: the first companion with spare stuff sets up a block of double chests near the first base (torch-lit,
+  grows pair by pair when full). Everybody puts what they don't need there and takes build material from it. Pockets
+  nearly full or full mid-job: the bot walks to the depot, unloads and carries on where it was. Items a job is
+  gathering or a build needs are never put in.
+- Stone types, gravel, cobble and logs are no longer thrown away when pockets are full (that is why builds kept going
+  out for the same blocks again) as long as there is somewhere to put them.
+- Inventory memory: every companion's pockets are counted every few seconds and remembered, and what the chests held
+  is saved (`stock.txt`, `chest_contents.txt` in the world's `ai-companion` folder). Before mining or chopping, a bot
+  counts what it already carries and what the chests hold; it doesn't mine what it has ("already have 40 coal on me").
+- Teamwork: while one companion gathers for a build it posts what it needs; idle ones drop spare items of that kind in
+  the depot or go and get some for it. Setting: `teamwork`.
+- Companions talk to each other through the AI: they answer each other's lines in their own voice (knowing what the team
+  carries and the depot holds) and a quiet one starts a conversation now and then; rationed, at most 3 replies per line.
+  Settings: `botChat`, `botChatMinMinutes`.
+- Mine stairs: several bots on the one-wide stairs no longer block each other for good ("the stairs are blocked"):
+  they wait for each other, retry, and let the pathfinder take a step the movement keys can't.
+
 ## 1.8.1 (Minecraft 26.3)
 
 - Commands win: the language model's plan steps no longer cancel a walk you asked for, the rest after "stop"/"come",

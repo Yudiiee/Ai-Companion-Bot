@@ -824,7 +824,15 @@ final class BlueprintBuilder {
                         SurvivalBrain.maybeSay(server, b, HumanChat.pick("need " + (want - have) + " " + what + ", gonna go get some",
                                 "getting " + what + " for the build"), 0.8);
                     }
-                    MiningSkills.collect(server, bot, b, t, want - have, true);
+                    Depot.postNeed(b.name, item, label(item), want - have);
+                    try {
+                        MiningSkills.collect(server, bot, b, t, want - have, true);
+                    } finally {
+                        Depot.clearNeed(b.name, item);
+                    }
+                    // the others may have dropped some in the depot meanwhile
+                    int now = onServer(server, () -> Gathering.countOf(bot, test), 0);
+                    if (now < want) Storage.withdraw(server, bot, b, test, want - now, null);
                 }
                 return onServer(server, () -> Gathering.countOf(bot, test), 0) >= want;
             }

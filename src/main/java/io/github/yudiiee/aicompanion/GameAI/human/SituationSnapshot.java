@@ -103,6 +103,11 @@ public final class SituationSnapshot {
                         .append(home.inside(bot.blockPosition()) ? " (you're inside it)" : "").append('\n');
             }
 
+            String team = Stock.teamSummary(name);
+            if (!team.isEmpty()) sb.append("- Team stock: ").append(team).append('\n');
+            String depot = Depot.summary(bot.level());
+            if (!depot.isEmpty()) sb.append("- Community depot (shared chests anyone can use for builds): ").append(depot).append('\n');
+
             BotStance stance = CompanionController.getInstance().getStance(name);
             sb.append("- What you're doing: ").append(switch (stance) {
                 case FOLLOW -> "following a player around";

@@ -70,6 +70,61 @@ public final class Storage {
                 CHESTS.add(new Spot(p[0], new BlockPos(Integer.parseInt(p[1]), Integer.parseInt(p[2]), Integer.parseInt(p[3]))));
             }
         } catch (Exception ignored) { }
+        loadSeen();
+    }
+
+    // What the chests held when last looked at survives a restart (chest_contents.txt), so nobody
+    // starts from scratch or goes out to mine what is sitting in a chest.
+    private static volatile long lastSeenSave;
+    private static volatile boolean seenDirty;
+
+    private static Path seenFile() {
+        return Home.worldFile("chest_contents.txt");
+    }
+
+    private static void loadSeen() {
+        try {
+            Path f = seenFile();
+            if (!Files.exists(f)) return;
+            for (String line : Files.readAllLines(f, StandardCharsets.UTF_8)) {
+                try {
+                    int bar = line.lastIndexOf('|');
+                    if (bar <= 0) continue;
+                    Map<String, Integer> m = new HashMap<>();
+                    String items = line.substring(bar + 1);
+                    if (!items.isEmpty()) for (String kv : items.split(",")) {
+                        int i = kv.lastIndexOf('=');
+                        if (i > 0) m.put(kv.substring(0, i), Integer.parseInt(kv.substring(i + 1)));
+                    }
+                    SEEN.put(line.substring(0, bar), m);
+                } catch (Exception ignored) { }
+            }
+        } catch (Exception ignored) { }
+    }
+
+    private static synchronized void saveSeen(boolean force) {
+        long now = System.currentTimeMillis();
+        if (!seenDirty || (!force && now - lastSeenSave < 20_000L)) return;
+        lastSeenSave = now;
+        seenDirty = false;
+        try {
+            StringBuilder sb = new StringBuilder();
+            for (Map.Entry<String, Map<String, Integer>> e : SEEN.entrySet()) {
+                sb.append(e.getKey()).append('|');
+                boolean first = true;
+                for (Map.Entry<String, Integer> kv : e.getValue().entrySet()) {
+                    if (!first) sb.append(',');
+                    first = false;
+                    sb.append(kv.getKey()).append('=').append(kv.getValue());
+                }
+                sb.append('\n');
+            }
+            Files.writeString(seenFile(), sb.toString(), StandardCharsets.UTF_8);
+        } catch (Exception ignored) { }
+    }
+
+    static void flushSeen() {
+        saveSeen(true);
     }
 
     private static synchronized void save() {
@@ -207,10 +262,11 @@ public final class Storage {
     static int[] deposit(ServerPlayer bot, Container c) {
         Inventory inv = bot.getInventory();
         Map<String, Integer> kept = new HashMap<>();
+        Predicate<String> reserved = SurvivalBrain.KEEP.getOrDefault(bot.getUUID(), p -> false);
         int moved = 0, left = 0;
         for (int i = 0; i < Math.min(36, inv.getContainerSize()); i++) {
             ItemStack s = inv.getItem(i);
-            if (s.isEmpty() || keeps(s, kept)) continue;
+            if (s.isEmpty() || keeps(s, kept) || reserved.test(SurvivalBrain.itemPath(s))) continue;
             moved += insert(c, s);
             if (!s.isEmpty()) left += s.getCount();
         }
@@ -220,6 +276,7 @@ public final class Storage {
 
     /** A chest nearby, or the makings of one on hand (so it won't go chopping trees with full pockets). */
     static boolean canStoreSoon(ServerPlayer bot) {
+        if (Depot.exists(bot.level())) return true;
         if (Home.get(bot) != null) return true;
         if (nearest(bot, 96) != null) return true;
         if (Building.firstItem(bot, "chest"::equals) != null) return true;
@@ -315,7 +372,13 @@ public final class Storage {
         int size = Math.min(36, inv.getContainerSize());
         if (freeSlots(inv) >= want) return freeSlots(inv);
         Predicate<String> reserved = SurvivalBrain.KEEP.getOrDefault(bot.getUUID(), p -> false);
-        for (String[] tier : JUNK) {
+        // stone types, gravel, cobble and logs are building material: with a depot to put them in they are
+        // stored, never thrown away (that was why a build kept going back out for the same blocks)
+        long nowMs = System.currentTimeMillis();
+        boolean keepBlocks = canStoreSoon(bot) && nowMs >= Depot.failUntil && nowMs >= backoffUntil;
+        for (int t = 0; t < JUNK.length; t++) {
+            if (t == 2 && keepBlocks) continue;
+            String[] tier = JUNK[t];
             for (int i = 0; i < size && freeSlots(inv) < want; i++) {
                 String p = SurvivalBrain.itemPath(inv.getItem(i));
                 if (reserved.test(p)) continue;
@@ -331,6 +394,8 @@ public final class Storage {
                 {"stone", "32"}, {"cobblestone", "64"}, {"_log", "64"}};
         for (String[] e : extras) {
             if (freeSlots(inv) >= want) break;
+            if (keepBlocks && (e[0].equals("stone") || e[0].equals("cobblestone") || e[0].equals("_log")
+                    || e[0].equals("cobbled_deepslate") || e[0].equals("sand"))) continue;
             int keep = Integer.parseInt(e[1]);
             int kept = 0;
             for (int i = 0; i < size; i++) {
@@ -351,10 +416,11 @@ public final class Storage {
     static int storable(ServerPlayer bot) {
         Inventory inv = bot.getInventory();
         Map<String, Integer> kept = new HashMap<>();
+        Predicate<String> reserved = SurvivalBrain.KEEP.getOrDefault(bot.getUUID(), p -> false);
         int n = 0;
         for (int i = 0; i < Math.min(36, inv.getContainerSize()); i++) {
             ItemStack s = inv.getItem(i);
-            if (!s.isEmpty() && !keeps(s, kept)) n += s.getCount();
+            if (!s.isEmpty() && !keeps(s, kept) && !reserved.test(SurvivalBrain.itemPath(s))) n += s.getCount();
         }
         return n;
     }
@@ -363,10 +429,11 @@ public final class Storage {
     static int storableSlots(ServerPlayer bot) {
         Inventory inv = bot.getInventory();
         Map<String, Integer> kept = new HashMap<>();
+        Predicate<String> reserved = SurvivalBrain.KEEP.getOrDefault(bot.getUUID(), p -> false);
         int n = 0;
         for (int i = 0; i < Math.min(36, inv.getContainerSize()); i++) {
             ItemStack s = inv.getItem(i);
-            if (!s.isEmpty() && !keeps(s, kept)) n++;
+            if (!s.isEmpty() && !keeps(s, kept) && !reserved.test(SurvivalBrain.itemPath(s))) n++;
         }
         return n;
     }
@@ -377,6 +444,9 @@ public final class Storage {
             if (talk) HumanChat.say(server, b.name, "nothing to put away");
             return 0;
         }
+        // the community depot comes first: everybody's spare stuff in one place, usable for every build
+        int viaDepot = Depot.unload(server, bot, b, talk);
+        if (viaDepot >= 0) return viaDepot;
         Home.Base home = onServer(server, () -> Home.get(bot), null);
         boolean canBuild = HumanConfig.get().autoHome && onServer(server, () -> Home.canStartBuilding(bot), false);
         if (home == null && canBuild && onServer(server, () -> nearest(bot, 96), null) == null) {
@@ -689,12 +759,21 @@ public final class Storage {
 
     /** Remembers what's in a chest right now. Server thread. */
     static void note(ServerLevel level, BlockPos p, Container c) {
+        load();
         Map<String, Integer> m = new HashMap<>();
         for (int i = 0; i < c.getContainerSize(); i++) {
             ItemStack s = c.getItem(i);
             if (!s.isEmpty()) m.merge(SurvivalBrain.itemPath(s), s.getCount(), Integer::sum);
         }
-        SEEN.put(key(level, p), m);
+        Map<String, Integer> old = SEEN.put(key(level, p), m);
+        if (!m.equals(old)) { seenDirty = true; saveSeen(false); }
+    }
+
+    /** What this chest held when last looked at (null if never). */
+    static Map<String, Integer> seen(ServerLevel level, BlockPos p) {
+        load();
+        Map<String, Integer> m = SEEN.get(key(level, p));
+        return m == null ? null : new HashMap<>(m);
     }
 
     /** Every storage chest it knows about in this dimension, the ones at home first. Server thread. */
