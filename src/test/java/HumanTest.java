@@ -71,7 +71,7 @@ public class HumanTest {
         var d7 = MiningSkills.parseStrip("find diamonds at y -58"); check(d7 != null && d7.label().equals("strip mine at y -58"), "find diamonds at y -58 -> " + (d7 == null ? null : d7.label()));
         check(MiningSkills.parseStrip("get me 3 diamonds") == null, "plain diamonds isn't strip");
         var r5 = MiningSkills.parseStrip("strip mine for diamonds at y -50 40 blocks long"); check(r5 != null && r5.label().equals("strip mine at y -50"), "strip y -> " + (r5 == null ? null : r5.label()));
-        var r6 = MiningSkills.parseStrip("strip mine for iron"); check(r6 != null && r6.label().equals("strip mine at y -58"), "strip for iron -> " + (r6 == null ? null : r6.label()));
+        var r6 = MiningSkills.parseStrip("strip mine for iron"); check(r6 != null && r6.label().equals("strip mine at y 16"), "strip for iron -> " + (r6 == null ? null : r6.label()));
         var rc = MiningSkills.parseStrip("strip mine for copper"); check(rc != null && rc.label().equals("strip mine at y 48"), "copper is not that deep -> " + (rc == null ? null : rc.label()));
         var r7 = MiningSkills.parseStrip("strip mine at y -80"); check(r7 != null && r7.label().equals("strip mine at y -59"), "clamped -> " + (r7 == null ? null : r7.label()));
         check(MiningSkills.resolve("cobblestone").matches().test("stone") && !MiningSkills.resolve("cobblestone").matches().test("cobblestone"), "cobble means natural stone");
@@ -128,11 +128,11 @@ public class HumanTest {
                     "Reference{ResourceKey[minecraft:worldgen/biome / minecraft:stony_peaks]=net.minecraft.world.level.biome.Biome@1a2b}");
             check(bm.find() && bm.group(1).equals("stony_peaks"), "biome name read from holder text");
 
-            check(MiningSkills.resolve("iron").stripY() == 14, "iron at y 14");
+            check(MiningSkills.resolve("iron").stripY() == 16, "iron at y 16 (the ore index)");
             check(MiningSkills.resolve("gold").stripY() == -16, "gold at y -16");
             check(MiningSkills.resolve("lapis").stripY() == 0, "lapis at y 0");
             check(MiningSkills.resolve("copper").stripY() == 48, "copper at y 48");
-            check(MiningSkills.resolve("diamonds").stripY() == -58 && MiningSkills.resolve("redstone").stripY() == -58, "diamond/redstone at -58");
+            check(MiningSkills.resolve("diamonds").stripY() == -59 && MiningSkills.resolve("redstone").stripY() == -58, "diamond -59 / redstone -58 (the ore index)");
             check(MiningSkills.resolve("ancient debris").stripY() == 15, "ancient debris at 15");
             check(MiningSkills.resolve("emeralds").stripY() != null, "emeralds get strip mined (mountains)");
 

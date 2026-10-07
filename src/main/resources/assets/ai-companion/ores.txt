@@ -1,0 +1,65 @@
+# ==============================================================================
+# MINECRAFT JAVA 26.3 ORE GENERATION & Y-LEVEL AGENT RETRIEVAL INDEX
+# FORMAT: AI AGENT NAVIGATION / MINING PATHFINDING / SYSTEM PROMPT MEMORY
+# ==============================================================================
+# SCHEMA:
+# ORE | ID: <namespaced_id> | DIM: <dimension> | Y_RANGE: <min> to <max> | OPTIMAL_Y: <y> | SHAPE: <distribution> | BIOME_BIAS: <biome> | AIR_DISCARD: <penalty> | MIN_TOOL: <tier> | DROPS: <item>
+#
+# DISTRIBUTION TYPES:
+#   TRIANGULAR : Frequency scales linearly towards OPTIMAL_Y peak.
+#   UNIFORM    : Equal spawn probability across entire range.
+#   SPECIAL    : Subject to biome overrides or structural vein patterns.
+#
+# TOOL TIERS:
+#   WOODEN < STONE < IRON < DIAMOND < NETHERITE
+# ==============================================================================
+
+### SECTION 1: OVERWORLD PRIMARY ORES (STANDARD STONE VARIANT)
+ORE | ID: minecraft:coal_ore | DIM: overworld | Y_RANGE: 0 to 320 | OPTIMAL_Y: 96 | SHAPE: TRIANGULAR | BIOME_BIAS: mountains | AIR_DISCARD: 0% | MIN_TOOL: WOODEN | DROPS: coal
+ORE | ID: minecraft:copper_ore | DIM: overworld | Y_RANGE: -16 to 112 | OPTIMAL_Y: 48 | SHAPE: TRIANGULAR | BIOME_BIAS: dripstone_caves | AIR_DISCARD: 0% | MIN_TOOL: STONE | DROPS: raw_copper
+ORE | ID: minecraft:iron_ore | DIM: overworld | Y_RANGE: -64 to 320 | OPTIMAL_Y: 16, 232 | SHAPE: TRIANGULAR | BIOME_BIAS: windswept_peaks | AIR_DISCARD: 0% | MIN_TOOL: STONE | DROPS: raw_iron
+ORE | ID: minecraft:gold_ore | DIM: overworld | Y_RANGE: -64 to 32 | OPTIMAL_Y: -16 | SHAPE: TRIANGULAR | BIOME_BIAS: none | AIR_DISCARD: 50% | MIN_TOOL: IRON | DROPS: raw_gold
+ORE | ID: minecraft:gold_ore_badlands | DIM: overworld | Y_RANGE: 32 to 256 | OPTIMAL_Y: 32 to 256 | SHAPE: UNIFORM | BIOME_BIAS: badlands_only | AIR_DISCARD: 0% | MIN_TOOL: IRON | DROPS: raw_gold
+ORE | ID: minecraft:lapis_ore | DIM: overworld | Y_RANGE: -64 to 64 | OPTIMAL_Y: 0 | SHAPE: TRIANGULAR | BIOME_BIAS: none | AIR_DISCARD: 100%_buried_batch | MIN_TOOL: STONE | DROPS: lapis_lazuli
+ORE | ID: minecraft:redstone_ore | DIM: overworld | Y_RANGE: -64 to 16 | OPTIMAL_Y: -58 | SHAPE: TRIANGULAR | BIOME_BIAS: none | AIR_DISCARD: 0% | MIN_TOOL: IRON | DROPS: redstone
+ORE | ID: minecraft:diamond_ore | DIM: overworld | Y_RANGE: -64 to 16 | OPTIMAL_Y: -59 | SHAPE: TRIANGULAR | BIOME_BIAS: none | AIR_DISCARD: 50% | MIN_TOOL: IRON | DROPS: diamond
+ORE | ID: minecraft:emerald_ore | DIM: overworld | Y_RANGE: -16 to 320 | OPTIMAL_Y: 232 | SHAPE: TRIANGULAR | BIOME_BIAS: mountain_peaks_only | AIR_DISCARD: 0% | MIN_TOOL: IRON | DROPS: emerald
+
+### SECTION 2: OVERWORLD DEEPSLATE VARIANTS (BELOW Y=0 TRANSITION)
+# Note: Deepslate transition begins between Y=0 and Y=-8. All blocks below Y=-8 generate as deepslate.
+ORE | ID: minecraft:deepslate_coal_ore | DIM: overworld | Y_RANGE: 0 to -8 | OPTIMAL_Y: 0 | SHAPE: TRIANGULAR | BIOME_BIAS: none | AIR_DISCARD: 100% | MIN_TOOL: WOODEN | DROPS: coal
+ORE | ID: minecraft:deepslate_copper_ore | DIM: overworld | Y_RANGE: -16 to 0 | OPTIMAL_Y: -8 | SHAPE: TRIANGULAR | BIOME_BIAS: dripstone_caves | AIR_DISCARD: 0% | MIN_TOOL: STONE | DROPS: raw_copper
+ORE | ID: minecraft:deepslate_iron_ore | DIM: overworld | Y_RANGE: -64 to 0 | OPTIMAL_Y: -16 | SHAPE: TRIANGULAR | BIOME_BIAS: none | AIR_DISCARD: 0% | MIN_TOOL: STONE | DROPS: raw_iron
+ORE | ID: minecraft:deepslate_gold_ore | DIM: overworld | Y_RANGE: -64 to 0 | OPTIMAL_Y: -16 | SHAPE: TRIANGULAR | BIOME_BIAS: none | AIR_DISCARD: 50% | MIN_TOOL: IRON | DROPS: raw_gold
+ORE | ID: minecraft:deepslate_lapis_ore | DIM: overworld | Y_RANGE: -64 to 0 | OPTIMAL_Y: -16 | SHAPE: TRIANGULAR | BIOME_BIAS: none | AIR_DISCARD: 100%_buried_batch | MIN_TOOL: STONE | DROPS: lapis_lazuli
+ORE | ID: minecraft:deepslate_redstone_ore | DIM: overworld | Y_RANGE: -64 to 0 | OPTIMAL_Y: -58 | SHAPE: TRIANGULAR | BIOME_BIAS: none | AIR_DISCARD: 0% | MIN_TOOL: IRON | DROPS: redstone
+ORE | ID: minecraft:deepslate_diamond_ore | DIM: overworld | Y_RANGE: -64 to 0 | OPTIMAL_Y: -59 | SHAPE: TRIANGULAR | BIOME_BIAS: none | AIR_DISCARD: 50% | MIN_TOOL: IRON | DROPS: diamond
+ORE | ID: minecraft:deepslate_emerald_ore | DIM: overworld | Y_RANGE: -16 to 0 | OPTIMAL_Y: -8 | SHAPE: TRIANGULAR | BIOME_BIAS: mountain_peaks_only | AIR_DISCARD: 0% | MIN_TOOL: IRON | DROPS: emerald
+
+### SECTION 3: NETHER ORES & ANCIENT DEBRIS
+ORE | ID: minecraft:nether_quartz_ore | DIM: nether | Y_RANGE: 10 to 117 | OPTIMAL_Y: 10 to 117 | SHAPE: UNIFORM | BIOME_BIAS: all_nether | AIR_DISCARD: 0% | MIN_TOOL: WOODEN | DROPS: quartz
+ORE | ID: minecraft:nether_gold_ore | DIM: nether | Y_RANGE: 10 to 117 | OPTIMAL_Y: 10 to 117 | SHAPE: UNIFORM | BIOME_BIAS: nether_wastes, basalt_deltas | AIR_DISCARD: 0% | MIN_TOOL: WOODEN | DROPS: gold_nugget
+ORE | ID: minecraft:ancient_debris_cluster | DIM: nether | Y_RANGE: 8 to 22 | OPTIMAL_Y: 15 | SHAPE: TRIANGULAR | BIOME_BIAS: all_nether | AIR_DISCARD: 100%_no_air_allowed | MIN_TOOL: DIAMOND | DROPS: ancient_debris
+ORE | ID: minecraft:ancient_debris_scatter | DIM: nether | Y_RANGE: 8 to 119 | OPTIMAL_Y: 15 | SHAPE: UNIFORM | BIOME_BIAS: all_nether | AIR_DISCARD: 100%_no_air_allowed | MIN_TOOL: DIAMOND | DROPS: ancient_debris
+
+### SECTION 4: LARGE ORE VEINS (MEGA-STRUCTURES)
+# Massive snaking veins consisting of raw ore blocks mixed with host rock
+ORE | ID: minecraft:iron_ore_vein | DIM: overworld | Y_RANGE: -60 to -8 | OPTIMAL_Y: -32 | SHAPE: SPECIAL_SNAKING | HOST_BLOCK: tuff | MIX: deepslate_iron_ore + raw_iron_block | MIN_TOOL: STONE
+ORE | ID: minecraft:copper_ore_vein | DIM: overworld | Y_RANGE: 0 to 50 | OPTIMAL_Y: 24 | SHAPE: SPECIAL_SNAKING | HOST_BLOCK: granite | MIX: copper_ore + raw_copper_block | MIN_TOOL: STONE
+
+### SECTION 5: GEODES & ANOMALY GENERATION
+ORE | ID: minecraft:amethyst_geode | DIM: overworld | Y_RANGE: -58 to 30 | OPTIMAL_Y: -16 to 16 | SHAPE: SPECIAL_HOLLOW_SPHERE | LAYERS: smooth_basalt, calcite, amethyst_block, budding_amethyst | MIN_TOOL: IRON
+
+### SECTION 6: AGENT MINING HEURISTICS & EFFICIENCY RULES
+# Optimal coordinate targets for automated agent pathfinding routines:
+STRATEGY | GOAL: diamond_mining | TARGET_Y: -59 | TECHNIQUE: strip_mine_or_caving | NOTE: Y=-59 maximizes diamond density while walking on solid bedrock/deepslate floor above lava lakes (Y=-54)
+STRATEGY | GOAL: netherite_mining | TARGET_Y: 15 | TECHNIQUE: bed_explosion_or_tnt | NOTE: 100% of large ancient debris veins generate covered by netherrack; strip-mining or bed blasts at Y=15 are mandatory
+STRATEGY | GOAL: iron_mining_early | TARGET_Y: 16 | TECHNIQUE: caving | NOTE: Y=16 gives highest underground peak without requiring deepslate-mining durability loss
+STRATEGY | GOAL: iron_mining_late | TARGET_Y: 232 | TECHNIQUE: surface_mountain_harvest | NOTE: Windswept mountain summits have massive exposed surface iron veins
+STRATEGY | GOAL: gold_mining_mass | TARGET_Y: 32 to 256 | TECHNIQUE: badlands_strip_mining | NOTE: Badlands surface generates up to 20x more gold per chunk than any underground layer
+STRATEGY | GOAL: copper_mining | TARGET_Y: 48 | TECHNIQUE: caving_dripstone | NOTE: Dripstone caves at Y=48 contain extreme copper cluster concentrations
+STRATEGY | GOAL: redstone_mining | TARGET_Y: -58 | TECHNIQUE: strip_mine | NOTE: Density increases linearly down to bedrock boundary
+STRATEGY | GOAL: emerald_mining | TARGET_Y: 232 | TECHNIQUE: mountain_peak_stripping | NOTE: Emeralds only spawn in Mountain/Windswept/Meadow/Cherry Grove biomes; density is near zero underground
+# ==============================================================================
+# END OF ORE DISTRIBUTION INDEX
+# ==============================================================================

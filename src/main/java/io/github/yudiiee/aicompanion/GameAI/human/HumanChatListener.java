@@ -57,7 +57,7 @@ public final class HumanChatListener {
     // Commands understood locally
     // ------------------------------------------------------------------------
 
-    public enum Local { FOLLOW, STAY, WANDER, COME, GIVE, INVENTORY, CRAFT, PVP, DIG, STRIP, COLLECT, FARM, ORE, WOOD, MINE, PLAY, STOP, HOUSE, CHEST, TAKE, STORE, HOME, CHESTS, BLUEPRINT, TREE, RECIPE, MAKE, PRICE, TRADE, DEAL, CITY, SMALL_TALK }
+    public enum Local { FOLLOW, STAY, WANDER, COME, GIVE, INVENTORY, CRAFT, PVP, DIG, STRIP, COLLECT, FARM, ORE, WOOD, MINE, PLAY, STOP, HOUSE, CHEST, TAKE, STORE, HOME, CHESTS, BLUEPRINT, TREE, RECIPE, MAKE, PRICE, ORE_INFO, TRADE, DEAL, CITY, SMALL_TALK }
 
     private static final Pattern FOLLOW = Pattern.compile("\\b(follow me|come with me|let'?s go|stick with me|tag along)\\b");
     private static final Pattern STAY = Pattern.compile("\\b(stay here|stay there|stay put|wait here|wait there|stop following|don'?t move|stop moving)\\b");
@@ -102,6 +102,7 @@ public final class HumanChatListener {
             if (Storage.parseTake(m) != null) return Local.TAKE;
             if (Economy.on() && Economy.parse(m) != null) return Local.TRADE;
             if (Woods.isQuestion(m)) return Local.TREE;
+            if (OreBook.question(m) != null) return Local.ORE_INFO;
             if (PriceBook.question(m) != null && PriceBook.itemFor(PriceBook.question(m)) != null) return Local.PRICE;
             if (City.parse(m, null, null) != null) return Local.CITY;
             if (RecipeBook.howTo(m) != null && RecipeBook.itemFor(RecipeBook.howTo(m)) != null) return Local.RECIPE;
@@ -293,6 +294,13 @@ public final class HumanChatListener {
             case PRICE -> {
                 String a = PriceBook.answer(PriceBook.question(HumanReactions.normalise(text, botName)));
                 HumanChat.say(server, botName, a != null ? a : "no idea what that's worth");
+            }
+            case ORE_INFO -> {
+                String q = OreBook.question(HumanReactions.normalise(text, botName));
+                String a = OreBook.answer(q);
+                if (a == null) { HumanChat.say(server, botName, "not sure where that one spawns"); return; }
+                String hub = MineHub.hubNote(bot, OreBook.find(q));
+                HumanChat.say(server, botName, a + (hub.isEmpty() ? "" : ". " + hub));
             }
             case CITY -> {
                 Blueprints.Ask a = City.parse(HumanReactions.normalise(text, botName), sender, bot);

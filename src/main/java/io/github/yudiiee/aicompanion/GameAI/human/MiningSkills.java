@@ -101,9 +101,9 @@ public final class MiningSkills {
     }
 
     private static final String[][] ORES = {
-            // name, pickaxe tier, strip-mine y
-            // (coal and emerald depend on where the bot is: see MineHub.levelFor)
-            {"coal", "1", "96"}, {"copper", "2", "48"}, {"iron", "2", "14"}, {"lapis", "2", "0"},
+            // name, pickaxe tier, strip-mine y: what the ore index (OreBook) says wins, these are if it's missing
+            // (emerald depends on where the bot is: see MineHub.levelFor)
+            {"coal", "1", "96"}, {"copper", "2", "48"}, {"iron", "2", "16"}, {"lapis", "2", "0"},
             {"gold", "3", "-16"}, {"redstone", "3", "-58"}, {"diamond", "3", "-58"}, {"emerald", "3", "232"},
     };
 
@@ -172,9 +172,9 @@ public final class MiningSkills {
                 if (!o[0].equals(name)) continue;
                 String ore = name + "_ore";
                 String deep = "deepslate_" + ore;
-                Integer y = o[2].isEmpty() ? null : Integer.parseInt(o[2]);
+                Integer y = o[2].isEmpty() ? null : OreBook.bestY(name, Integer.parseInt(o[2]));
                 return new Target(name, p -> p.equals(ore) || p.equals(deep), false, false,
-                        Integer.parseInt(o[1]), 6, y);
+                        OreBook.tier(name, Integer.parseInt(o[1])), 6, y);
             }
         }
         if (q.matches("(ore|ores|any ore|any ores)"))
@@ -182,7 +182,8 @@ public final class MiningSkills {
         if (q.matches("(quartz|nether quartz|quartz ore)"))
             return new Target("quartz", "nether_quartz_ore"::equals, false, false, 1, 8, null);
         if (q.matches("(ancient debris|debris|netherite|netherite scrap|netherite scraps)"))
-            return new Target("ancient debris", "ancient_debris"::equals, false, false, 4, 2, 15);
+            return new Target("ancient debris", "ancient_debris"::equals, false, false, OreBook.tier("ancient debris", 4), 2,
+                    OreBook.bestY("ancient debris", 15));
 
         // anything else: exact block id, singular, or a small family ("leaves", "terracotta")
         List<String> ids = blockIds();

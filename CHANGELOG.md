@@ -1,5 +1,19 @@
 # AI Companion - Changelog
 
+## 1.8.0 (Minecraft 26.3)
+
+- The ore index: every companion remembers where each ore generates in 26.3 (y range, best level, biome, how it's
+  spread, whether it shows next to air), the pickaxe it needs and what it drops, plus the mining plans that go with
+  it. It ships with the mod (`assets/ai-companion/ores.txt`); your own lines go in `config/ai-companion/ores.txt`.
+- Ask them: "where do i find diamonds", "what y level for iron", "what pickaxe do i need for gold", "how deep is
+  lapis". The answer comes from the index, with where the town mine's hub for it is. The language model gets the
+  index lines for the ores being talked about.
+- Hubs all the way down the mine: the stairs stop at each ore's best level (coal 96 or 8 under the entrance, copper
+  48, iron 16, lapis 0, gold -16, diamond and redstone at -58), run through a lit 3×3 hub with strips out left and
+  right, then carry on down. Companions mine each ore from its own hub. Mines from 1.7 get their hubs dug beside the
+  stairs the first time somebody needs that level.
+- Pickaxe tiers and mining levels for ores come from the index (iron is now mined at 16, its underground peak).
+
 ## 1.7.0 (Minecraft 26.3)
 
 - One mine per town, shared by every companion: nobody digs for stone or ore anywhere else in the Overworld any more.

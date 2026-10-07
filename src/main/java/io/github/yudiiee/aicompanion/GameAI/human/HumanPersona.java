@@ -83,6 +83,15 @@ public final class HumanPersona {
                     for (RecipeBook.Recipe r : rs) sb.append("- ").append(r.explain()).append('\n');
                 }
             } catch (Exception ignored) { }
+            // where ores are and what pickaxe they take, from the ore index every companion remembers
+            try {
+                java.util.List<String> os = OreBook.mentioned(ConversationMemory.transcript(4), 4);
+                if (!os.isEmpty()) {
+                    sb.append("\nORES YOU REMEMBER (exact, from the ore index; levels are y, pickaxe tiers wooden < stone < iron < diamond < netherite):\n");
+                    for (String o : os) sb.append("- ").append(o).append('\n');
+                    sb.append("- every ore's best level: ").append(OreBook.primer()).append('\n');
+                }
+            } catch (Exception ignored) { }
             // prices for what's being talked about, from the price list every companion remembers
             try {
                 java.util.List<String> ps = PriceBook.mentioned(ConversationMemory.transcript(4), 8);

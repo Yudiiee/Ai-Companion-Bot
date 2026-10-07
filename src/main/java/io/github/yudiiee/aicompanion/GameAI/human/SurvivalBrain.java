@@ -698,6 +698,8 @@ public final class SurvivalBrain {
     }
 
     static int requiredPickFor(String orePath) {
+        int known = OreBook.tierFor(orePath); // the ore index every companion remembers
+        if (known > 0) return known;
         if (orePath.contains("diamond") || orePath.contains("gold") || orePath.contains("redstone") || orePath.contains("emerald")) return 3;
         if (orePath.contains("iron") || orePath.contains("copper") || orePath.contains("lapis")) return 2;
         return 1;

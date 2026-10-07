@@ -386,15 +386,74 @@ public class TownTest {
         // ---------------- the mine ----------------
         check(MineHub.BRANCH_LEN == 20 && MineHub.TORCH_EVERY == 6 && MineHub.BRANCH_EVERY == 3 && MineHub.BOTTOM_Y == -58,
                 "branches 20 long every 3, a torch every 6, the hub at -58");
-        MiningSkills.Target iron = new MiningSkills.Target("iron", p2 -> p2.equals("iron_ore"), false, false, 2, 6, 14);
+        MiningSkills.Target iron = new MiningSkills.Target("iron", p2 -> p2.equals("iron_ore"), false, false, 2, 6, 16);
         MiningSkills.Target coal = new MiningSkills.Target("coal", p2 -> p2.equals("coal_ore"), false, false, 1, 6, 96);
         MiningSkills.Target stone = new MiningSkills.Target("stone", "stone"::equals, false, true, 1, 16, null);
         MiningSkills.Target deep = new MiningSkills.Target("deepslate", "deepslate"::equals, false, true, 1, 16, null);
         MiningSkills.Target any = new MiningSkills.Target("ores", p2 -> p2.endsWith("_ore"), false, false, 1, 8, null);
-        check(MineHub.defaultLevel(iron) == -58 && MineHub.defaultLevel(any) == -58 && MineHub.defaultLevel(deep) == -58
-                && MineHub.defaultLevel(null) == -58, "ores and deepslate come from the strips at -58");
-        check(MineHub.defaultLevel(coal) == 48 && MineHub.defaultLevel(stone) == MineHub.STONE_Y, "coal and stone from strips part way down");
-        check(MineHub.Mine.levelOf("-58@2") == -58 && MineHub.Mine.levelOf("16") == 16, "strip levels");
+        check(MineHub.defaultLevel(any) == -58 && MineHub.defaultLevel(deep) == -58 && MineHub.defaultLevel(null) == -58,
+                "any ore and deepslate come from the hub at the bottom");
+        check(MineHub.defaultLevel(iron) == 16 && MineHub.defaultLevel(coal) == 96 && MineHub.defaultLevel(stone) == MineHub.STONE_Y,
+                "iron, coal and stone at their own levels");
+        check(MineHub.defaultLevel(MiningSkills.resolve("gold")) == -16 && MineHub.defaultLevel(MiningSkills.resolve("lapis")) == 0
+                && MineHub.defaultLevel(MiningSkills.resolve("copper")) == 48 && MineHub.defaultLevel(MiningSkills.resolve("diamonds")) == -58
+                && MineHub.defaultLevel(MiningSkills.resolve("redstone")) == -58, "gold -16, lapis 0, copper 48, diamond/redstone at the bottom");
+        check(MineHub.Mine.levelOf("-58@2") == -58 && MineHub.Mine.levelOf("16") == 16 && MineHub.Mine.levelOf("48@1") == 48, "strip levels");
+
+        // ---------------- the ore index ----------------
+        List<String> oreLines = Files.readAllLines(res.resolve("ores.txt"));
+        long oreCount = oreLines.stream().filter(l -> l.startsWith("ORE")).count();
+        long parsed = oreLines.stream().filter(l -> OreBook.parseOre(l) != null).count();
+        long strats = oreLines.stream().filter(l -> OreBook.parseStrategy(l) != null).count();
+        check(oreCount >= 20 && parsed == oreCount && strats == 8, "every line of the ore index parses (" + parsed + "/" + oreCount + ", " + strats + " plans)");
+        OreBook.use(oreLines);
+        OreBook.Ore io = OreBook.find("iron");
+        check(io != null && io.min() == -64 && io.max() == 320 && io.best().length == 2 && io.best()[0] == 16 && io.best()[1] == 232
+                && io.tier() == 2 && io.drops().equals("raw_iron"), "iron: -64..320, best 16 and 232, stone pickaxe");
+        OreBook.Ore bad = OreBook.find("badlands gold");
+        check(bad != null && bad.spread() && bad.tier() == 3 && !bad.primary(), "badlands gold is uniform 32..256, not a hub");
+        check(OreBook.find("diamonds").bestY() == -59 && OreBook.find("deepslate iron").bestY() == -16 && OreBook.find("netherite").bestY() == 15,
+                "diamond -59, deepslate iron -16, debris 15");
+        check(OreBook.tierFor("deepslate_iron_ore") == 2 && OreBook.tierFor("ancient_debris") == 4 && OreBook.tierFor("nether_gold_ore") == 1
+                && OreBook.tierFor("coal_ore") == 1 && OreBook.tierFor("diamond_ore") == 3 && OreBook.tierFor("stone") == 0, "pickaxe tiers from the index");
+        check(MiningSkills.resolve("iron").tier() == 2 && MiningSkills.resolve("gold").tier() == 3 && MiningSkills.resolve("iron").stripY() == 16
+                && MiningSkills.resolve("ancient debris").tier() == 4, "mining targets use the index");
+        check(OreBook.hubLevels(-58).keySet().equals(new java.util.LinkedHashSet<>(List.of(96, 48, 16, 0, -16, -58))),
+                "hub levels from the index: " + OreBook.hubLevels(-58));
+        check(MineHub.hubLevels(70).equals(List.of(62, 48, 16, 0, -16, -58)), "entrance at 70: coal's hub 8 under it, then the rest " + MineHub.hubLevels(70));
+        check(MineHub.hubLevels(120).equals(List.of(96, 48, 16, 0, -16, -58)), "high entrance: coal's hub at 96 " + MineHub.hubLevels(120));
+        check(MineHub.hubLevels(52).equals(List.of(44, 16, 0, -16, -58)), "low entrance: coal and copper share a hub " + MineHub.hubLevels(52));
+        check(MineHub.hubLevels(-40).equals(List.of(-48, -58)) && MineHub.hubLevels(-48).equals(List.of(-58)), "deep entrance: one hub 8 under it, else just the bottom " + MineHub.hubLevels(-40));
+        List<Integer> h70 = MineHub.hubLevels(70);
+        check(MineHub.nearestHub(h70, MineHub.defaultLevel(coal)) == 62 && MineHub.nearestHub(h70, 48) == 48 && MineHub.nearestHub(h70, -59) == -58
+                && MineHub.nearestHub(h70, MineHub.STONE_Y) == 16, "each ore goes to its hub");
+        check(MineHub.hubFor(70, 62).equals("coal") && MineHub.hubFor(70, -58).contains("diamond") && MineHub.hubFor(52, 44).contains("copper")
+                && MineHub.hubFor(52, 44).contains("coal"), "what each hub is for");
+        int[] fw = {0, 1};
+        check(java.util.Arrays.equals(MineHub.stripDir(fw, 0), fw) && java.util.Arrays.equals(MineHub.stripDir(fw, 3), new int[]{0, -1})
+                && MineHub.stripDir(fw, 1)[0] == -MineHub.stripDir(fw, 2)[0], "hub strip directions");
+        check(java.util.Arrays.equals(new MineHub.Hub(null, 'i', 0).strips(), new int[]{1, 2})
+                && java.util.Arrays.equals(new MineHub.Hub(null, 'b', 0).strips(), new int[]{0, 1, 2})
+                && java.util.Arrays.equals(new MineHub.Hub(null, 's', 0).strips(), new int[]{0, 2, 3}),
+                "the stairs carry on through a hub on the way down (no strip straight ahead)");
+
+        // chat
+        check("diamonds".equals(OreBook.question("where do i find diamonds")) && "gold".equals(OreBook.question("what pickaxe do i need for gold"))
+                && "iron".equals(OreBook.question("what y level for iron")) && "netherite".equals(OreBook.question("best y level for netherite"))
+                && "lapis".equals(OreBook.question("how deep is lapis")), "ore questions");
+        check(OreBook.question("where are you") == null && OreBook.question("where is the mine") == null && OreBook.question("get me some iron") == null
+                && OreBook.question("how much is iron") == null, "not ore questions");
+        String ad = OreBook.answer("diamonds");
+        check(ad.contains("-59") && ad.contains("iron pickaxe") && ad.contains("drops diamond"), "diamonds answer: " + ad);
+        String ag = OreBook.answer("gold");
+        check(ag.contains("-16") && ag.contains("iron pickaxe"), "gold answer: " + ag);
+        check(OreBook.answer("netherite").contains("nether") && OreBook.answer("netherite").contains("diamond pickaxe"), "debris answer: " + OreBook.answer("netherite"));
+        check(OreBook.mentioned("anyone know where copper is", 4).size() == 1 && OreBook.primer().contains("diamond y -59"), "persona lines");
+        check(HumanChatListener.classifyLocal("where do i find diamonds", "Steve") == HumanChatListener.Local.ORE_INFO
+                && HumanChatListener.classifyLocal("what pickaxe for gold", "Steve") == HumanChatListener.Local.ORE_INFO,
+                "ore questions get answered from the index");
+        HumanChatListener.Local fl = HumanChatListener.classifyLocal("find diamonds", "Steve");
+        check(fl != HumanChatListener.Local.ORE_INFO && fl != null, "\"find diamonds\" is still a job (" + fl + ")");
         System.out.println(fails == 0 ? "ALL PASSED" : fails + " FAILED");
         System.exit(fails == 0 ? 0 : 1);
     }

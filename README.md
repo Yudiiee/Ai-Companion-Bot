@@ -23,7 +23,9 @@ on their own out of the box, and you can hook them up to an LLM for real convers
 - **Chests it remembers.** It uses what's in its pockets first, then the chests, and only then
   goes out to gather.
 - **One mine for the whole town.** Nobody digs for stone or ore anywhere else: a 3×3 staircase goes down to y -58,
-  three strip mines run out from a hub at the bottom (thousands of blocks, branches every 3, 20 long), a torch
+  stopping at a hub at each ore's best level on the way (copper 48, iron 16, lapis 0, gold -16, diamonds at the
+  bottom, from the ore index every companion remembers). Strip mines run out from each hub (thousands of blocks,
+  branches every 3, 20 long), a torch
   every 6 blocks everywhere, and each companion takes its own strip. Caves it breaks into get lit, or sealed off
   if there's water or lava in them, and each trip carries on where the last one stopped.
 - **Food farm.** A 9×9 plot beside the house with water, torches and crops (carrots/potatoes, then

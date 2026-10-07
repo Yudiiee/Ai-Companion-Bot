@@ -62,14 +62,20 @@ and makes each companion feel like another person playing with you.
 - The stairs are 3 wide and 3 high, a block down per step, with a torch on the wall every 6 steps, down to y -58.
   One companion digs them further at a time; the others wait and then walk on down. `dig down` / `make a mine`
   digs (or carries on with) the shared staircase.
+- Hubs on the way down, at each ore's best level from the ore index (below): coal at 96 (or 8 under the entrance,
+  whichever is lower), copper 48, iron 16, lapis 0, gold -16, then diamond and redstone at the bottom, -58. The
+  stairs run straight through each one (stairs down > hub > stairs carry on down > hub ...): a flat 3×3×3 lit room
+  with a strip mine out to the left and one to the right; the stairs go on down from its far side. Hubs closer than
+  6 blocks share one. A companion after an ore goes to that ore's hub and takes a strip there; on mines dug before
+  1.8 (stairs already past the level), the hub goes beside the stairs instead, 2 blocks out to the right, with strips
+  straight on, back and out to the right (an old strip at that level becomes its right-hand one).
 - At the bottom: a lit 3×3×3 hub. Three strip mines run out of it (straight on, left and right), on and on, a trip
   at a time, so they reach thousands of blocks. Each has branches every 3 blocks on both sides, 20 long, and a
   torch every 6 blocks in the strip and every branch (no branches for the first 22 blocks, so the three strips'
   branches never dig into each other). Each companion takes a strip of its own (the one it had last time, else the
   shortest free one); with all three taken, it waits for one.
-- Ores, deepslate and tuff come from the strips at -58. Coal and copper aren't found that deep, so they come from a
-  strip off the same staircase at y 48 (or 8 below the entrance if that's lower), and plain stone and its kinds
-  from one at y 16. `strip mine at y 20` digs a strip off the staircase at that level.
+- Diamond, redstone, "any ore", deepslate and tuff come from the hub at -58; plain stone and its kinds from the iron
+  hub at 16. `strip mine at y 20` digs a strip off the staircase at that level (one within 5 of a hub uses the hub).
 - A trip goes until it has what it came for (counting what's in its pockets), its pockets are full, it's hurt,
   its pickaxe breaks or 40 minutes are up; then it walks back along the strip, through the hub and up the stairs,
   and puts the loot away. Next trip it carries on where the strip ended. A strip that runs into lava or water is
@@ -246,6 +252,15 @@ and makes each companion feel like another person playing with you.
 - Builds are saved per world (`<world>/ai-companion/builds.txt`); finished ones aren't mined or tunnelled through.
 
 **Prices and money** (diamonds)
+- Every companion remembers the ore index that ships with the mod (`assets/ai-companion/ores.txt`, Minecraft 26.3):
+  for every ore, deepslate ore, Nether ore, ore vein and geode, where it generates (y range, best level, biome), how
+  it's spread, whether it shows next to air, the pickaxe it needs and what it drops, plus mining plans (diamonds at
+  -59, netherite at 15, iron at 16 or 232...). The mine's hubs go at the best levels in it, and the pickaxe a
+  companion fetches for an ore comes from it. Your own lines go in `config/ai-companion/ores.txt` (same format; a
+  line there wins for its ID).
+- "where do i find diamonds", "what y level for iron", "best level for netherite", "how deep is lapis", "what pickaxe
+  do i need for gold": the answer from the index, and where the town mine's hub for it is. In conversation, the
+  language model gets the index lines for the ores being talked about.
 - Every companion remembers the price list that ships with the mod (273 items in ten sections: 26.3 additions, wood,
   stone and terrain, ores and metals, workstations, redstone, mob drops, food, tools and armour, smithing templates
   and trophies). Your own prices go in `config/ai-companion/prices.txt`, one per line in the same format
