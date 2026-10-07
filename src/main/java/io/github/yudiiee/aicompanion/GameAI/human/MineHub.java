@@ -28,13 +28,16 @@ import java.util.regex.Pattern;
 import static io.github.yudiiee.aicompanion.GameAI.human.SurvivalBrain.onServer;
 
 /**
- * The bot's mine, like a player's: one staircase down from a fixed spot (1 wide, 3 high, one
- * block down per step, a torch every 6 steps), a lit 3x3x3 landing at the bottom (y -58), and
- * at each ore's level a straight trunk off the staircase with branches every 3 blocks, 24
- * long, both sides, lit every 6 blocks. Caves it breaks into get lit, or sealed off when
- * there's water or lava in them. It walks the same stairs down and back up every trip, and
- * each trip carries on where the tunnel ended last time. Saved per bot, per world
- * ({@code <world>/ai-companion/mines.txt}).
+ * The mine, like a server's community mine: ONE per town (or one for all the companions when
+ * there's no town yet), and nobody digs for stone or ore anywhere else. A staircase 3 wide and
+ * 3 high goes down from a fixed entrance, a block down per step, with a torch every 6 steps,
+ * to a lit hub at y -58. From the hub, strip mines run out three ways (on and on, a trip at a
+ * time: they can reach thousands of blocks), each with branches every 3 blocks on both sides,
+ * 20 long, and a torch every 6 blocks everywhere. Each companion takes a strip of its own so
+ * they don't dig into each other. The few things that don't occur that deep (coal, copper,
+ * plain stone and its kinds, emeralds) are dug from a strip off the same staircase at their
+ * level. Caves it breaks into get lit, or sealed off when there's water or lava in them.
+ * Saved per world ({@code <world>/ai-companion/mines.txt}).
  */
 final class MineHub {
 
@@ -43,7 +46,9 @@ final class MineHub {
     static final int BOTTOM_Y = -58;
     static final int TORCH_EVERY = 6;
     static final int BRANCH_EVERY = 3;
-    static final int BRANCH_LEN = 24;
+    static final int BRANCH_LEN = 20;
+    /** Stone, andesite, granite...: dug from a strip at this level (there's only deepslate at the bottom). */
+    static final int STONE_Y = 16;
     static final int TRIP_LEN = 30;
     private static final long AWAIT_MS = 15 * 60_000L;
     private static final long TRIP_MS = 40 * 60_000L;
@@ -61,16 +66,29 @@ final class MineHub {
         final List<BlockPos> stairs = new java.util.concurrent.CopyOnWriteArrayList<>();
         volatile BlockPos bottom;
         /**
-         * y -> {dx, dz, length, step index it starts from, state} of the trunk tunnel at that
-         * level. State: 0 open, 1 moved to the other side once, 2 blocked for good.
+         * The strip mines: "y" (off the staircase at that level) or "y@k" (strip k = 0, 1, 2 out of the
+         * hub at the bottom: straight on, left, right) -> {dx, dz, length, step index it starts
+         * from (-1: the hub), state}. State: 0 open, 1 moved to the other side once, 2 blocked for good.
          */
-        final Map<Integer, int[]> trunks = new ConcurrentHashMap<>();
+        final Map<String, int[]> trunks = new ConcurrentHashMap<>();
         boolean temporary;
 
         Mine(String dim, int dx, int dz) { this.dim = dim; this.dx = dx; this.dz = dz; }
 
         BlockPos origin() { return stairs.get(0); }
         BlockPos last() { return stairs.get(stairs.size() - 1); }
+
+        /** Where a strip starts: its step on the stairs, or (hub strips) the edge of the hub. */
+        BlockPos start(int[] t) {
+            if (t[3] < 0) return bottom == null ? last() : bottom.offset(t[0], 0, t[1]);
+            return t[3] < stairs.size() ? stairs.get(t[3]) : last();
+        }
+
+        /** The level a strip is at. */
+        static int levelOf(String key) {
+            int at = key.indexOf('@');
+            return Integer.parseInt(at < 0 ? key : key.substring(0, at));
+        }
 
         /** First step at or below {@code y}, or -1 if the stairs don't go that deep. */
         int indexAtOrBelow(int y) {
@@ -127,11 +145,11 @@ final class MineHub {
                 if (!p[5].equals("-")) {
                     for (String t : p[5].split(";")) {
                         String[] q = t.split(":");
-                        int y = Integer.parseInt(q[0]);
+                        int y = Mine.levelOf(q[0]);
                         int idx = q.length >= 6 ? Integer.parseInt(q[4]) : m.indexAtOrBelow(y);
                         int state = q.length >= 6 ? Integer.parseInt(q[5]) : 0;
-                        if (idx < 0 || idx >= m.stairs.size()) continue;
-                        m.trunks.put(y, new int[]{Integer.parseInt(q[1]), Integer.parseInt(q[2]), Integer.parseInt(q[3]), idx, state});
+                        if (idx >= m.stairs.size() || (idx < 0 && !q[0].contains("@"))) continue;
+                        m.trunks.put(q[0], new int[]{Integer.parseInt(q[1]), Integer.parseInt(q[2]), Integer.parseInt(q[3]), idx, state});
                     }
                 }
                 if (!m.stairs.isEmpty()) MINES.put(p[0] + "|" + p[1], m);
@@ -149,7 +167,7 @@ final class MineHub {
                 if (m.temporary || m.stairs.isEmpty()) continue;
                 String bot = e.getKey().substring(0, e.getKey().indexOf('|'));
                 StringBuilder trunks = new StringBuilder();
-                for (Map.Entry<Integer, int[]> t : m.trunks.entrySet()) {
+                for (Map.Entry<String, int[]> t : m.trunks.entrySet()) {
                     if (trunks.length() > 0) trunks.append(';');
                     int[] v = t.getValue();
                     trunks.append(t.getKey()).append(':').append(v[0]).append(':').append(v[1]).append(':').append(v[2])
@@ -170,34 +188,140 @@ final class MineHub {
         }
     }
 
-    /** This bot's mine in this dimension, if its entrance is within {@code radius} blocks. Server thread. */
-    static Mine near(ServerPlayer bot, int radius) {
+    /** Whose mine a bot uses: its town's (the nearest town within 500 blocks), else the one everybody shares. Server thread. */
+    static String owner(ServerPlayer bot) {
+        // the town it lives by (its home), else the town it's in: not wherever a long strip took it
+        Home.Base h = Home.get(bot);
+        BlockPos at = h != null && h.dim().equals(Home.dim(bot.level())) ? h.middle() : bot.blockPosition();
+        City.Town t = City.nearest(bot.level(), at);
+        if (t != null && t.center().distSqr(at) < 500 * 500) return "town" + t.id;
+        return "shared";
+    }
+
+    private static String sharedKey(ServerPlayer bot) {
+        return owner(bot) + "|" + Home.dim(bot.level());
+    }
+
+    /**
+     * The mine this bot uses (its town's, or everybody's), wherever it is, or null if there isn't
+     * one yet. A mine a bot dug for itself before mines were shared becomes the shared one. Server thread.
+     */
+    static Mine shared(ServerPlayer bot) {
         load();
-        Mine m = MINES.get(key(bot));
+        String key = sharedKey(bot);
+        Mine m = MINES.get(key);
+        if (m != null) return m;
+        String dim = Home.dim(bot.level());
+        // the mine everybody used before there was a town here becomes the town's
+        if (key.startsWith("town")) {
+            Mine sh = MINES.get("shared|" + dim);
+            City.Town t = City.nearest(bot.level(), bot.blockPosition());
+            if (sh != null && t != null && sh.origin().distSqr(t.center()) < 600 * 600) {
+                MINES.remove("shared|" + dim);
+                MINES.put(key, sh);
+                save();
+                return sh;
+            }
+        }
+        String best = null;
+        double bd = 400.0 * 400;
+        for (Map.Entry<String, Mine> e : MINES.entrySet()) {
+            String owner = e.getKey().substring(0, e.getKey().indexOf('|'));
+            if (!e.getValue().dim.equals(dim) || owner.startsWith("town") || owner.equals("shared")) continue;
+            double d = e.getValue().origin().distSqr(bot.blockPosition());
+            if (d < bd) { bd = d; best = e.getKey(); }
+        }
+        if (best == null) return null;
+        m = MINES.remove(best);
+        // its old strip at the bottom runs right beside where the hub's right-hand strip would go
+        if (m.trunks.containsKey(String.valueOf(BOTTOM_Y))) m.trunks.put(BOTTOM_Y + "@2", new int[]{0, 0, 0, -1, 2});
+        MINES.put(key, m);
+        save();
+        return m;
+    }
+
+    /** The shared mine, if any part of it is within {@code radius} blocks. Server thread. */
+    static Mine near(ServerPlayer bot, int radius) {
+        Mine m = shared(bot);
         if (m == null) return null;
         BlockPos f = bot.blockPosition();
         List<BlockPos> spots = new ArrayList<>(List.of(m.origin(), m.last()));
-        for (int[] t : m.trunks.values()) {
-            if (t[3] < 0 || t[3] >= m.stairs.size()) continue;
-            spots.add(m.stairs.get(t[3]).offset(t[0] * t[2], 0, t[1] * t[2]));
-        }
+        for (int[] t : m.trunks.values()) spots.add(m.start(t).offset(t[0] * t[2], 0, t[1] * t[2]));
         for (BlockPos o : spots) {
             if (Math.hypot(o.getX() - f.getX(), o.getZ() - f.getZ()) <= radius) return m;
         }
         return null;
     }
 
-    /** A new mine starting where the bot stands, heading {@code (dx, dz)}. Replaces its old one. Server thread. */
-    private static Mine create(ServerPlayer bot, int dx, int dz, boolean temporary) {
+    /** A new mine starting at {@code at}, heading {@code (dx, dz)}: the shared one (or a one-off). Server thread. */
+    private static Mine create(ServerPlayer bot, BlockPos at, int dx, int dz, boolean temporary) {
         load();
         Mine m = new Mine(Home.dim(bot.level()), dx, dz);
         m.temporary = temporary;
-        m.stairs.add(BotPathing.feet(bot));
+        m.stairs.add(at);
         if (!temporary) {
-            MINES.put(key(bot), m);
+            MINES.put(sharedKey(bot), m);
             save();
         }
         return m;
+    }
+
+    private static Mine create(ServerPlayer bot, int dx, int dz, boolean temporary) {
+        return create(bot, BotPathing.feet(bot), dx, dz, temporary);
+    }
+
+    /**
+     * Where the shared mine starts: near the bot, on dry ground, outside the town's buildings and
+     * anybody's builds, with the first stretch of its stairs clear of them too. {x, y, z, dx, dz}
+     * (feet position), or null. Server thread.
+     */
+    static int[] entranceSpot(ServerPlayer bot, Float yawHint) {
+        ServerLevel level = bot.level();
+        String dim = Home.dim(level);
+        BlockPos f = BotPathing.feet(bot);
+        // look from the surface even if the bot is down a hole
+        City.Town town = City.nearest(level, f);
+        int surfaceY = Math.max(f.getY(), town != null ? town.cy : 63);
+        int[] h = heading(bot, yawHint);
+        int[][] dirs = {h, right(h), left(h), {-h[0], -h[1]}};
+        for (int r = 0; r <= 40; r += 4) {
+            for (int a = 0; a < Math.max(1, r * 2); a++) {
+                double ang = r == 0 ? 0 : Math.PI * 2 * a / (r * 2);
+                int x = f.getX() + (int) Math.round(Math.cos(ang) * r), z = f.getZ() + (int) Math.round(Math.sin(ang) * r);
+                int[] c = City.column(level, x, z, surfaceY);
+                if (c == null || c[1] == 1) continue;
+                BlockPos feet = new BlockPos(x, c[0] + 1, z);
+                if (taken(level, dim, feet, 4)) continue;
+                for (int[] d : dirs) {
+                    boolean clear = true;
+                    for (int k = 1; k <= 12 && clear; k++) {
+                        BlockPos q = feet.offset(d[0] * k, -k, d[1] * k);
+                        if (taken(level, dim, q, 2)) clear = false;
+                    }
+                    if (clear) return new int[]{feet.getX(), feet.getY(), feet.getZ(), d[0], d[1]};
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Part of (or right next to) the town, somebody's build or a home? Server thread. */
+    private static boolean taken(ServerLevel level, String dim, BlockPos p, int margin) {
+        if (City.overlapsTown(dim, p.getX() - margin, p.getZ() - margin, p.getX() + margin, p.getZ() + margin, 0)) return true;
+        for (int dx = -margin; dx <= margin; dx += margin) for (int dz = -margin; dz <= margin; dz += margin) {
+            if (Blueprints.protects(level, p.offset(dx, 0, dz))) return true;
+        }
+        for (Home.Base hb : Home.allIn(level)) if (hb.middle().distSqr(p) < 12 * 12) return true;
+        return false;
+    }
+
+    /** The shared mine, starting one if there isn't one yet. Server thread. */
+    private static Mine sharedOrNew(ServerPlayer bot, Float yawHint) {
+        Mine m = shared(bot);
+        if (m != null) return m;
+        int[] e = entranceSpot(bot, yawHint);
+        if (e == null) return null; // nowhere clear: not in the street, not in somebody's base
+        return create(bot, new BlockPos(e[0], e[1], e[2]), e[3], e[4], false);
     }
 
     private static int[] heading(ServerPlayer bot, Float yawHint) {
@@ -247,10 +371,14 @@ final class MineHub {
         final int needTier;
         final long end = System.currentTimeMillis() + TRIP_MS;
         boolean saidNoTorches;
+        /** What counts as getting it (raw iron for iron, cobblestone for stone...), and how many it had at the start. */
+        java.util.function.Predicate<String> items;
+        int startCount;
         Trip(MiningSkills.Target want, int wantCount) {
             this.want = want;
             this.wantCount = wantCount;
             this.needTier = Math.max(1, want == null ? 1 : want.tier());
+            this.items = want == null ? null : Gathering.itemsFor(want);
         }
     }
 
@@ -266,13 +394,14 @@ final class MineHub {
         if (!SurvivalBrain.canContinue(b)) return;
         stepOutOfHouse(server, bot);
         Trip trip = new Trip(null, 0);
-        Mine m = onServer(server, () -> {
-            Mine ex = near(bot, 8);
-            if (ex != null) return ex;
-            int[] d = heading(bot, yawHint);
-            return create(bot, d[0], d[1], false);
-        }, null);
+        boolean existed = onServer(server, () -> shared(bot) != null, false);
+        Mine m = onServer(server, () -> sharedOrNew(bot, yawHint), null);
         if (m == null) return;
+        if (existed) {
+            BlockPos o = m.origin();
+            SurvivalBrain.maybeSay(server, b, "we've got a mine already (at " + o.getX() + " " + o.getY() + " " + o.getZ() + "), using that one", 1.0);
+        }
+        if (onServer(server, () -> trip.items == null, true)) trip.startCount = 0;
         String why = goDown(server, bot, b, m, y, trip);
         if (why != null || !SurvivalBrain.canContinue(b)) {
             if (why != null) MiningSkills.finishStrip(server, b, trip.found, why);
@@ -281,7 +410,7 @@ final class MineHub {
             return;
         }
         boolean atBottom = onServer(server, () -> BotPathing.feet(bot).equals(m.last()), false);
-        if (atBottom) buildLanding(server, bot, b, m);
+        if (atBottom && m.bottom == null) buildLanding(server, bot, b, m);
         onServer(server, () -> { save(); return null; }, null);
         StringBuilder sb = new StringBuilder(HumanChat.pick("made it to y " + y + ".", "ok, the stairs are done, we're at y " + y + "."));
         if (!trip.found.isEmpty()) {
@@ -328,31 +457,35 @@ final class MineHub {
         if (!SurvivalBrain.canContinue(b)) return;
         stepOutOfHouse(server, bot);
 
-        Mine here = onServer(server, () -> near(bot, 160), null);
-        if (here != null && y >= here.origin().getY()
-                && onServer(server, () -> BotPathing.feet(bot).getY() < here.origin().getY() - 3, false)) {
-            climbOut(server, bot, b, here);
-            if (!SurvivalBrain.canContinue(b)) return;
-        }
+        Mine shared0 = onServer(server, () -> shared(bot), null);
         int feetY = onServer(server, () -> BotPathing.feet(bot).getY(), y);
+        boolean nether = onServer(server, () -> Home.dim(bot.level()).contains("nether"), false);
+        // only a level somebody asked for can be above the mine's entrance (a mountain, "at y 100"): a one-off staircase
+        boolean above = yOverride != null && (shared0 != null ? y >= shared0.origin().getY() : y >= feetY);
         Mine m = onServer(server, () -> {
-            // the bot's mine, when this level is somewhere below its entrance (from wherever in the mine it is)
-            Mine ex = near(bot, 160);
-            if (ex != null && plan.y() < ex.origin().getY()) return ex;
-            int[] d = heading(bot, yawHint);
-            // no mine around here yet: this is where it starts
-            if (ex == null && plan.y() < feetY) return create(bot, d[0], d[1], false);
-            // the level is above the mine / above us (a mountain, "at y 100"): a one-off staircase, the mine is kept
-            return create(bot, d[0], d[1], true);
+            if (above) {
+                int[] d = heading(bot, yawHint);
+                return create(bot, d[0], d[1], true);
+            }
+            return sharedOrNew(bot, yawHint);
         }, null);
-        if (m == null) return;
+        if (m == null) {
+            HumanChat.say(server, b.name, "can't find a good spot for the mine around here (it has to be clear of the town and everyone's builds)."
+                    + " take me somewhere open and ask again");
+            return;
+        }
+        // coal, copper and stone come from a strip part way down: below the entrance, whatever the entrance's height
+        if (yOverride == null && !nether && !m.temporary && y != BOTTOM_Y && y > m.origin().getY() - 8) {
+            y = Math.max(BOTTOM_Y, m.origin().getY() - 8);
+        }
         if (!m.temporary) {
-            // an existing tunnel a few blocks off this level: carry on with that one (tunnels 1-2 apart dig into each other)
-            if (!m.trunks.containsKey(y)) {
+            // an existing strip a few blocks off this level: carry on with that one (strips 1-2 apart dig into each other)
+            if (y != BOTTOM_Y && !m.trunks.containsKey(String.valueOf(y))) {
                 int best = y, bd = 5;
-                for (Map.Entry<Integer, int[]> e : m.trunks.entrySet()) {
-                    int d = Math.abs(e.getKey() - y);
-                    if (d < bd && e.getValue()[4] < 2) { bd = d; best = e.getKey(); }
+                for (Map.Entry<String, int[]> e : m.trunks.entrySet()) {
+                    if (e.getKey().contains("@")) continue;
+                    int d = Math.abs(Mine.levelOf(e.getKey()) - y);
+                    if (d < bd && e.getValue()[4] < 2) { bd = d; best = Mine.levelOf(e.getKey()); }
                 }
                 y = best;
             }
@@ -361,17 +494,65 @@ final class MineHub {
         String what = want == null ? "at y " + level : want.label() + " at y " + level;
         SurvivalBrain.maybeSay(server, b, HumanChat.pick("heading down the mine for " + what, "going down to y " + level), 0.6);
 
+        trip.startCount = trip.items == null ? 0 : onServer(server, () -> Gathering.countOf(bot, trip.items), 0);
         String why = goDown(server, bot, b, m, level, trip);
         if (why == null && SurvivalBrain.canContinue(b)) {
-            int idx = m.temporary ? m.stairs.size() - 1 : m.indexAtOrBelow(level);
-            if (idx < 0) idx = m.stairs.size() - 1;
-            MiningSkills.maybeSay(server, b, HumanChat.pick("ok, at y " + level + ". tunnelling out", "made it down, branching out now"));
-            why = tunnel(server, bot, b, m, idx, Math.max(4, length), trip);
+            boolean hub = !m.temporary && level == BOTTOM_Y;
+            if (hub && m.bottom == null && onServer(server, () -> BotPathing.feet(bot).equals(m.last()), false)) {
+                buildLanding(server, bot, b, m);
+            }
+            MiningSkills.maybeSay(server, b, HumanChat.pick("ok, at y " + level + ". strip mining", "made it down, branching out now"));
+            if (hub && m.bottom != null) {
+                why = hubStrip(server, bot, b, m, Math.max(4, length), trip);
+            } else {
+                int idx = m.temporary ? m.stairs.size() - 1 : m.indexAtOrBelow(level);
+                if (idx < 0) idx = m.stairs.size() - 1;
+                why = tunnel(server, bot, b, m, idx, Math.max(4, length), trip);
+            }
         }
         onServer(server, () -> { save(); return null; }, null);
         if (!SurvivalBrain.canContinue(b) && why == null) return; // told to stop: the chat already answered
         MiningSkills.finishStrip(server, b, trip.found, why);
         if (SurvivalBrain.canContinue(b)) climbOut(server, bot, b, m);
+    }
+
+    /**
+     * Stone and ore don't get dug just anywhere: in the Overworld, everything that takes a pickaxe
+     * comes out of the mine. (Logs, dirt, sand, gravel and clay are still picked up outside.) Server thread.
+     */
+    static boolean underground(ServerPlayer bot, MiningSkills.Target t) {
+        if (t == null || t.logs() || t.tier() < 1) return false;
+        if (!Home.overworld(bot.level())) return false;
+        if (t.stripY() != null || t.label().equals("ores")) return true;
+        // the stone the mine goes through; other "stony" things (sandstone, terracotta, basalt...) aren't down there
+        for (String id : MINE_STONE) if (t.test(id)) return true;
+        return false;
+    }
+
+    static final String[] MINE_STONE = {"stone", "cobblestone", "deepslate", "cobbled_deepslate", "andesite", "diorite", "granite",
+            "tuff", "calcite", "coal_ore", "iron_ore", "copper_ore", "gold_ore", "redstone_ore", "lapis_ore", "diamond_ore",
+            "emerald_ore", "deepslate_iron_ore", "deepslate_diamond_ore", "deepslate_gold_ore", "deepslate_redstone_ore",
+            "deepslate_lapis_ore", "deepslate_copper_ore", "deepslate_coal_ore", "deepslate_emerald_ore"};
+
+    /** The level the mine digs for something in the Overworld (before fitting it under the entrance). */
+    static int defaultLevel(MiningSkills.Target want) {
+        if (want == null) return BOTTOM_Y;
+        String label = want.label();
+        if (label.equals("coal") || label.equals("copper")) return 48;
+        if (label.equals("emerald") && want.stripY() != null) return Math.min(want.stripY(), 64);
+        if (want.stripY() == null && !label.equals("ores") && !label.contains("deepslate") && !label.equals("tuff")) return STONE_Y;
+        return BOTTOM_Y;
+    }
+
+    /** "get 32 stone", "mine 10 iron": a trip down the mine until it has that many. Job thread. */
+    static void mineFor(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, MiningSkills.Target t, int count, boolean quiet)
+            throws InterruptedException {
+        boolean have = onServer(server, () -> shared(bot) != null, false);
+        if (!quiet) {
+            SurvivalBrain.maybeSay(server, b, have ? HumanChat.pick("heading to the mine for " + t.label(), "off down the mine for " + t.label())
+                    : HumanChat.pick("we don't have a mine yet, gonna dig one", "time to dig us a proper mine"), 0.8);
+        }
+        mineOre(server, bot, b, t, Math.max(1, count), null, 400, null);
     }
 
     // ------------------------------------------------------------------------
@@ -404,9 +585,13 @@ final class MineHub {
                 return Plan.no("emeralds only spawn in mountain biomes (peaks, slopes, windswept hills). take me to some mountains");
             return Plan.at(Math.max(-16, Math.min(232, Math.floorDiv(feet - 6, 8) * 8)));
         }
-        if (label.equals("coal")) return Plan.at(feet >= 102 ? 96 : Math.max(0, Math.floorDiv(feet - 6, 8) * 8)); // high up, into the hills
-        if (want == null || want.stripY() == null) return Plan.at(BOTTOM_Y);
-        return Plan.at(want.stripY());
+        if (nether) return Plan.at(want.stripY() != null ? want.stripY() : 15);
+        // everything else comes out of the strips at the bottom of the mine, except what isn't found that deep
+        if (label.equals("coal") || label.equals("copper")) return Plan.at(48);
+        if (want == null) return Plan.at(BOTTOM_Y);
+        if (want.stripY() == null && !want.label().equals("ores") && !want.label().contains("deepslate") && !want.label().equals("tuff"))
+            return Plan.at(STONE_Y);
+        return Plan.at(BOTTOM_Y);
     }
 
     private static final Pattern BIOME = Pattern.compile("worldgen/biome / [a-z0-9_.-]+:([a-z0-9_/.-]+)");
@@ -504,8 +689,58 @@ final class MineHub {
             // the steps skip this level (a sidestep made two at once): close enough
             return null;
         }
-        return extendStairs(server, bot, b, m, y, trip);
+        if (m.temporary) return extendStairs(server, bot, b, m, y, trip);
+        // one at a time digs the stairs further: the others wait for them (and then walk on down)
+        String mineId = Integer.toHexString(System.identityHashCode(m));
+        long waitUntil = System.currentTimeMillis() + 20 * 60_000L;
+        boolean said = false;
+        final long[] beat = {System.currentTimeMillis()};
+        Object[] mineLock = new Object[]{b.name, beat};
+        while (true) {
+            long now = System.currentTimeMillis();
+            Object[] got = DIGGING.compute(mineId, (k, cur) -> {
+                if (cur == null || cur[0].equals(b.name) || now - ((long[]) cur[1])[0] > 3 * 60_000L) return mineLock;
+                return cur;
+            });
+            if (got == mineLock) break;
+            Object[] holder = got;
+            if (!SurvivalBrain.canContinue(b) || now > waitUntil) return SurvivalBrain.canContinue(b) ? "waited ages for the stairs to get dug, giving up" : null;
+            if (!said) {
+                said = true;
+                SurvivalBrain.maybeSay(server, b, holder[0] + "'s digging the stairs further down, i'll wait", 0.7);
+            }
+            if (!MiningSkills.upkeep(server, bot, b)) return null;
+            SurvivalBrain.sleep(3000);
+            // they got there: walk on down the new steps
+            if (m.last().getY() <= y) {
+                int from = onServer(server, () -> stairUnder(bot, m), -1);
+                int target2 = m.indexAtOrBelow(y);
+                if (from >= 0 && target2 >= 0) {
+                    List<BlockPos> more = new ArrayList<>();
+                    for (int i = from; i <= target2; i++) more.add(m.stairs.get(i));
+                    if (walkCells(server, bot, b, more)) return null;
+                }
+            }
+        }
+        try {
+            // walk to the bottom step first (someone may have dug further while this one walked)
+            int from = onServer(server, () -> stairUnder(bot, m), -1);
+            if (from >= 0 && from < m.stairs.size() - 1) {
+                List<BlockPos> more = new ArrayList<>(m.stairs.subList(from, m.stairs.size()));
+                if (!walkCells(server, bot, b, more)) return SurvivalBrain.canContinue(b) ? "couldn't get down the stairs" : null;
+            }
+            DIG_BEAT.set(beat);
+            return extendStairs(server, bot, b, m, y, trip);
+        } finally {
+            DIG_BEAT.remove();
+            DIGGING.remove(mineId, mineLock);
+        }
     }
+
+    /** Who's digging a mine's stairs further right now (mine -> {bot, long[]{last step}}). */
+    private static final Map<String, Object[]> DIGGING = new ConcurrentHashMap<>();
+    /** The digger's heartbeat: bumped on every step, so a slow descent doesn't lose the stairs to a second digger. */
+    private static final ThreadLocal<long[]> DIG_BEAT = new ThreadLocal<>();
 
     /** Digs more steps from the bottom of the stairs until the feet are at {@code y}. */
     private static String extendStairs(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, Mine m, int y, Trip trip)
@@ -521,6 +756,8 @@ final class MineHub {
             int v = feetY > y ? -1 : 1;
             BlockPos from = onServer(server, () -> BotPathing.feet(bot), null);
             if (from == null) return null;
+            long[] hb = DIG_BEAT.get();
+            if (hb != null) hb[0] = System.currentTimeMillis();
             if (MiningSkills.step(server, bot, b, dir[0], dir[1], v)) {
                 afterStep(server, bot, b, m, from, dir, trip, true);
                 blocked = 0;
@@ -553,7 +790,19 @@ final class MineHub {
     }
 
     /** At the bottom: a 3x3, 3 high room around the last step, floored, with a torch. */
+    private static final Set<Mine> LANDING = ConcurrentHashMap.newKeySet();
+
+    /** One companion builds the hub (the others carry on once it's there). */
     private static void buildLanding(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, Mine m) throws InterruptedException {
+        if (m.bottom != null || !LANDING.add(m)) return;
+        try {
+            buildLandingNow(server, bot, b, m);
+        } finally {
+            LANDING.remove(m);
+        }
+    }
+
+    private static void buildLandingNow(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, Mine m) throws InterruptedException {
         // centred one block past the last step, so the step before it keeps its floor
         BlockPos c = m.last().offset(m.dx, 0, m.dz);
         for (int dy = 0; dy <= 2; dy++) {
@@ -590,34 +839,107 @@ final class MineHub {
     // Trunk and branches
     // ------------------------------------------------------------------------
 
-    /** The trunk at the level of step {@code idx}: carries on from where it ended, branching every 3. */
+    /** The strip at the level of step {@code idx}, off the stairs: carries on from where it ended, branching every 3. */
     private static String tunnel(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, Mine m, int idx, int length, Trip trip)
             throws InterruptedException {
         int y = m.stairs.get(idx).getY();
-        int[] tr = m.trunks.get(y);
+        String key = String.valueOf(y);
+        int[] tr = m.trunks.get(key);
         if (tr != null && tr[4] >= 2) return HumanChat.pick("that level's blocked off by water and lava here, try another ore",
-                "can't tunnel at this level from my mine, there's lava/water both ways");
-        if (tr != null) idx = tr[3];
-        BlockPos s0 = m.stairs.get(idx);
-        int[] dir = {m.dx, m.dz};
-        // always off to the right of the stairs: the stairs can go on down past it, and the
-        // stair torches (left wall) and sidesteps (left first) stay out of its way
-        int[] t = tr != null ? new int[]{tr[0], tr[1]} : right(dir);
-        int len0 = tr != null ? tr[2] : 0;
-        int state = tr != null ? tr[4] : 0;
-        final int sIdx = idx;
-        if (tr == null) m.trunks.put(y, new int[]{t[0], t[1], 0, sIdx, 0});
+                "can't tunnel at this level from the mine, there's lava/water both ways");
+        if (tr == null) {
+            // always off to the right of the stairs: the stairs can go on down past it, and the
+            // stair torches (left wall) and sidesteps (left first) stay out of its way
+            int[] r = right(new int[]{m.dx, m.dz});
+            m.trunks.put(key, new int[]{r[0], r[1], 0, idx, 0});
+        }
+        return strip(server, bot, b, m, key, length, trip, 0);
+    }
 
-        // back to where the tunnel ended last time
+    /** Who's in which strip out of the hub right now ("key|mine" -> {bot, since}). */
+    private static final Map<String, Object[]> STRIP_TAKEN = new ConcurrentHashMap<>();
+
+    /**
+     * A strip out of the hub at the bottom: the one this bot had, else a free one (the shortest),
+     * so two companions are never in the same strip. Waits a little if all three are taken.
+     */
+    private static String hubStrip(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, Mine m, int length, Trip trip)
+            throws InterruptedException {
+        int[] f = {m.dx, m.dz};
+        int[][] dirs = {f, left(f), right(f)};
+        String me = b.name;
+        String mineId = Integer.toHexString(System.identityHashCode(m));
+        String key = null;
+        for (int attempt = 0; attempt < 30 && key == null && SurvivalBrain.canContinue(b); attempt++) {
+            synchronized (STRIP_TAKEN) {
+                long now = System.currentTimeMillis();
+                String best = null;
+                int bestLen = Integer.MAX_VALUE;
+                boolean anyOpen = false;
+                for (int k = 0; k < 3; k++) {
+                    String kk = BOTTOM_Y + "@" + k;
+                    int[] t = m.trunks.get(kk);
+                    if (t != null && t[4] >= 2) continue;
+                    anyOpen = true;
+                    Object[] who = STRIP_TAKEN.get(kk + "|" + mineId);
+                    boolean mine = who != null && who[0].equals(me);
+                    boolean free = who == null || mine || now - (Long) who[1] > 45 * 60_000L;
+                    if (!free) continue;
+                    int len = t == null ? 0 : t[2];
+                    if (mine) { best = kk; break; }
+                    if (len < bestLen) { bestLen = len; best = kk; }
+                }
+                if (!anyOpen) return HumanChat.pick("every strip at the bottom of the mine ran into lava or water",
+                        "the bottom of the mine is blocked off every way, gonna need a new mine");
+                if (best != null) {
+                    key = best;
+                    STRIP_TAKEN.put(key + "|" + mineId, new Object[]{me, now});
+                }
+            }
+            if (key == null) {
+                if (attempt == 0) SurvivalBrain.maybeSay(server, b, "all the strips are taken, waiting for one", 0.6);
+                if (!MiningSkills.upkeep(server, bot, b)) return null;
+                SurvivalBrain.sleep(3000);
+            }
+        }
+        if (key == null) return SurvivalBrain.canContinue(b) ? "the mine's full right now, everyone's down there" : null;
+        int k = key.charAt(key.length() - 1) - '0';
+        if (!m.trunks.containsKey(key)) m.trunks.put(key, new int[]{dirs[k][0], dirs[k][1], 0, -1, 0});
+        try {
+            return strip(server, bot, b, m, key, length, trip, BRANCH_LEN + 2);
+        } finally {
+            STRIP_TAKEN.remove(key + "|" + mineId);
+        }
+    }
+
+    /**
+     * Digs on along a strip ({@code key}): back to where it ended last time, then a block at a
+     * time with a torch every 6 and a branch both ways every 3 (past {@code plainUntil}: near the
+     * hub the strips' branches would dig into each other).
+     */
+    private static String strip(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, Mine m, String key, int length,
+                                Trip trip, int plainUntil) throws InterruptedException {
+        int[] tr = m.trunks.get(key);
+        BlockPos s0 = m.start(tr);
+        int[] t = {tr[0], tr[1]};
+        int len0 = tr[2];
+        int state = tr[4];
+        final int sIdx = tr[3];
+        // back to where the strip ended last time (out of the hub first, for the strips at the bottom)
         List<BlockPos> old = new ArrayList<>();
+        if (sIdx < 0 && m.bottom != null) { old.add(m.bottom); old.add(s0); }
         for (int k = 1; k <= len0; k++) old.add(s0.offset(t[0] * k, 0, t[1] * k));
         if (!old.isEmpty()) {
-            SurvivalBrain.maybeSay(server, b, HumanChat.pick("carrying on where i left off", "back to the end of my tunnel"), 0.5);
+            if (len0 > 0) SurvivalBrain.maybeSay(server, b, HumanChat.pick("carrying on where the strip left off", "back to the end of the strip"), 0.5);
             if (!walkCells(server, bot, b, old)) {
                 if (!SurvivalBrain.canContinue(b)) return null;
-                giveUpTrunk(m, y, t, sIdx, state);
-                return HumanChat.pick("my old tunnel is blocked, i'll start a new one next time", "couldn't get to the end of the tunnel");
+                giveUpTrunk(m, key, t, sIdx, state);
+                return HumanChat.pick("the strip is blocked, i'll start a new one next time", "couldn't get to the end of the strip");
             }
+        }
+        if (sIdx < 0 && len0 == 0) {
+            // the first block of a hub strip is the hub's edge itself: stand there
+            if (!MiningSkills.returnTo(server, bot, s0)) return HumanChat.pick("can't get out of the hub, hm", "stuck at the bottom");
         }
         int[] l = left(t), r = right(t);
         Direction[] trunkWalls = {Building.dirOf(l[0], l[1]), Building.dirOf(r[0], r[1])};
@@ -628,16 +950,16 @@ final class MineHub {
             if (!MiningSkills.returnTo(server, bot, prev)) return HumanChat.pick("got a bit lost down here, stopping", "lost my tunnel lol, stopping here");
             if (!MiningSkills.step(server, bot, b, t[0], t[1], 0)) {
                 if (!SurvivalBrain.canContinue(b)) return null;
-                giveUpTrunk(m, y, t, sIdx, state);
-                return HumanChat.pick("tunnel ran into water or lava, i'll start a fresh one next time", "hit lava or water up ahead, that's it for this tunnel");
+                giveUpTrunk(m, key, t, sIdx, state);
+                return HumanChat.pick("the strip ran into water or lava, that's it for this one", "hit lava or water up ahead, that's it for this strip");
             }
             afterStep(server, bot, b, m, prev, t, trip, false);
             BlockPos here = s0.offset(t[0] * k, 0, t[1] * k);
             final int kk = k;
-            m.trunks.put(y, new int[]{t[0], t[1], k, sIdx, state});
+            m.trunks.put(key, new int[]{t[0], t[1], k, sIdx, state});
             if (k % TORCH_EVERY == 1) torch(server, bot, b, here, trip, trunkWalls);
             if (k % 5 == 0) onServer(server, () -> { save(); return null; }, null);
-            if (kk % BRANCH_EVERY != 0) continue;
+            if (kk <= plainUntil || kk % BRANCH_EVERY != 0) continue;
             for (int[] side : new int[][]{l, r}) {
                 why = branch(server, bot, b, m, here, side, t, trip);
                 if (why != null) return why;
@@ -647,13 +969,16 @@ final class MineHub {
         return null;
     }
 
-    /** This trunk can't go on: next time start one on the other side of the stairs; if that fails too, give up on the level. */
-    private static void giveUpTrunk(Mine m, int y, int[] t, int idx, int state) {
-        if (state == 0) m.trunks.put(y, new int[]{-t[0], -t[1], 0, idx, 1});
-        else m.trunks.put(y, new int[]{t[0], t[1], 0, idx, 2});
+    /**
+     * This strip can't go on. Off the stairs: next time start one on the other side; if that fails
+     * too, give up on the level. Out of the hub: that way's done (the other strips go on).
+     */
+    private static void giveUpTrunk(Mine m, String key, int[] t, int idx, int state) {
+        if (state == 0 && idx >= 0) m.trunks.put(key, new int[]{-t[0], -t[1], 0, idx, 1});
+        else m.trunks.put(key, new int[]{t[0], t[1], 0, idx, 2});
     }
 
-    /** One side branch from {@code junction}: 24 blocks out, torches every 6, then back. */
+    /** One side branch from {@code junction}: 20 blocks out, torches every 6, then back. */
     private static String branch(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, Mine m, BlockPos junction,
                                  int[] side, int[] trunk, Trip trip) throws InterruptedException {
         List<BlockPos> path = new ArrayList<>();
@@ -694,12 +1019,30 @@ final class MineHub {
         if (at == null) return;
         if (stairs) {
             m.stairs.add(at);
-            int[] l = left(new int[]{m.dx, m.dz});
-            if ((m.stairs.size() - 1) % TORCH_EVERY == 0) torch(server, bot, b, at, trip, Building.dirOf(l[0], l[1]));
+            // the stairs are 3 wide and 3 high: the blocks either side of the step go too
+            int[] l = left(dir), r = right(dir);
+            if (!m.temporary) {
+                for (int[] side : new int[][]{l, r}) {
+                    for (int dy = 0; dy <= 2; dy++) {
+                        BlockPos p = at.offset(side[0], dy, side[1]);
+                        if (onServer(server, () -> !Building.isSolid(bot.level(), p), true)) continue;
+                        MiningSkills.dig(server, bot, b, p, true, 0); // (refuses anything next to water or lava)
+                    }
+                }
+            }
+            if ((m.stairs.size() - 1) % TORCH_EVERY == 0) {
+                // on the wall beside the stairs (with the stairs 3 wide, that's one over)
+                BlockPos wallSide = m.temporary ? at : at.offset(l[0], 0, l[1]);
+                torch(server, bot, b, wallSide, trip, Building.dirOf(l[0], l[1]));
+            }
             if (m.stairs.size() % 10 == 0 && !m.temporary) onServer(server, () -> { save(); return null; }, null);
         }
-        breach(server, bot, b, from, at, dir, stairs);
+        breach(server, bot, b, from, at, dir, stairs, stairs && !m.temporary);
         MiningSkills.mineOresInReach(server, bot, b, trip.found, trip.want, trip.got);
+        if (trip.items != null) {
+            int now = onServer(server, () -> Gathering.countOf(bot, trip.items), trip.startCount);
+            trip.got[0] = Math.max(trip.got[0], now - trip.startCount);
+        }
     }
 
     // ------------------------------------------------------------------------
@@ -714,9 +1057,25 @@ final class MineHub {
      * itself: how big it is and whether there's water or lava in it. Server thread.
      */
     static Opening look(ServerLevel level, BlockPos from, BlockPos at, int height) {
+        return look(level, from, at, height, null);
+    }
+
+    /** {@code across}: the stairs are 3 wide this way, so the cells either side are the stairs too. */
+    static Opening look(ServerLevel level, BlockPos from, BlockPos at, int height, int[] across) {
         Set<BlockPos> ours = new HashSet<>();
         for (int dy = 0; dy <= 2; dy++) { ours.add(from.offset(0, dy, 0)); ours.add(at.offset(0, dy, 0)); }
         ours.add(at.below());
+        if (across != null) {
+            for (int s2 = -1; s2 <= 1; s2 += 2) {
+                for (int dy = -1; dy <= 3; dy++) {
+                    ours.add(from.offset(across[0] * s2, dy, across[1] * s2));
+                    ours.add(at.offset(across[0] * s2, dy, across[1] * s2));
+                    // and the step above/below, which is 3 wide as well
+                    ours.add(from.offset(across[0] * s2 - (at.getX() - from.getX()), dy + 1, across[1] * s2 - (at.getZ() - from.getZ())));
+                }
+            }
+            for (int dy = -1; dy <= 3; dy++) ours.add(from.offset(-(at.getX() - from.getX()), dy + 1, -(at.getZ() - from.getZ())));
+        }
         List<BlockPos> holes = new ArrayList<>();
         boolean fluid = false;
         for (int dy = 0; dy < height; dy++) {
@@ -755,10 +1114,10 @@ final class MineHub {
      * there's water or lava in it, block the holes up instead (cobblestone or whatever's to hand).
      */
     private static void breach(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, BlockPos from, BlockPos at, int[] dir,
-                               boolean stairs) {
+                               boolean stairs, boolean wide) {
         String line = onServer(server, () -> {
             ServerLevel level = bot.level();
-            Opening o = look(level, from, at, stairs ? 3 : 2);
+            Opening o = look(level, from, at, stairs ? 3 : 2, wide ? left(dir) : null);
             if (o.holes().isEmpty() || (o.size() < 6 && !o.fluid())) return null;
             if (o.fluid()) {
                 int sealed = 0;
@@ -785,27 +1144,27 @@ final class MineHub {
      * Falls back to digging its own way up. Job thread.
      */
     static boolean climbOut(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, Mine m) throws InterruptedException {
-        // in a trunk? walk back along it to the stairs first
-        int[] where = onServer(server, () -> {
+        // in a strip? walk back along it to the stairs (or the hub, then the stairs) first
+        Object[] where = onServer(server, () -> {
             BlockPos f = BotPathing.feet(bot);
-            for (Map.Entry<Integer, int[]> e : m.trunks.entrySet()) {
-                int y = e.getKey();
+            for (Map.Entry<String, int[]> e : m.trunks.entrySet()) {
+                int y = Mine.levelOf(e.getKey());
                 if (Math.abs(f.getY() - y) > 1) continue;
                 int[] t = e.getValue();
-                int idx = t[3];
-                if (idx < 0 || idx >= m.stairs.size()) continue;
-                BlockPos s0 = m.stairs.get(idx);
-                for (int k = t[2]; k >= 1; k--) {
+                BlockPos s0 = m.start(t);
+                for (int k = t[2]; k >= 0; k--) {
                     BlockPos c = s0.offset(t[0] * k, 0, t[1] * k);
-                    if (Math.hypot(c.getX() - f.getX(), c.getZ() - f.getZ()) < 1.6) return new int[]{idx, k, t[0], t[1]};
+                    if (Math.hypot(c.getX() - f.getX(), c.getZ() - f.getZ()) < 1.6) return new Object[]{s0, k, t[0], t[1], t[3] < 0};
                 }
             }
             return null;
         }, null);
         if (where != null) {
-            BlockPos s0 = m.stairs.get(where[0]);
+            BlockPos s0 = (BlockPos) where[0];
+            int k0 = (Integer) where[1], tx = (Integer) where[2], tz = (Integer) where[3];
             List<BlockPos> back = new ArrayList<>();
-            for (int k = where[1] - 1; k >= 0; k--) back.add(s0.offset(where[2] * k, 0, where[3] * k));
+            for (int k = k0 - 1; k >= 0; k--) back.add(s0.offset(tx * k, 0, tz * k));
+            if ((Boolean) where[4] && m.bottom != null) { back.add(m.bottom); back.add(m.last()); }
             walkCells(server, bot, b, back);
         }
         int idx = onServer(server, () -> stairUnder(bot, m), -1);
@@ -819,14 +1178,12 @@ final class MineHub {
 
     /** Tunnel cells of the mine near {@code p}, for tests and diagnostics. */
     static int stairsCount(ServerPlayer bot) {
-        load();
-        Mine m = MINES.get(key(bot));
+        Mine m = shared(bot);
         return m == null ? 0 : m.stairs.size();
     }
 
     static Vec3 entrance(ServerPlayer bot) {
-        load();
-        Mine m = MINES.get(key(bot));
+        Mine m = shared(bot);
         return m == null ? null : Vec3.atBottomCenterOf(m.origin());
     }
 }

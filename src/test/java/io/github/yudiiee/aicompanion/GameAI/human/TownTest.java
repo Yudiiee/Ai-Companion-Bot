@@ -383,6 +383,18 @@ public class TownTest {
         Schematic amp = Schematic.load(schem.resolve("city_amphitheatre.nbt"));
         check(amp.at(0, 0, 0) == null, "amphitheatre doesn't dig out its corners");
 
+        // ---------------- the mine ----------------
+        check(MineHub.BRANCH_LEN == 20 && MineHub.TORCH_EVERY == 6 && MineHub.BRANCH_EVERY == 3 && MineHub.BOTTOM_Y == -58,
+                "branches 20 long every 3, a torch every 6, the hub at -58");
+        MiningSkills.Target iron = new MiningSkills.Target("iron", p2 -> p2.equals("iron_ore"), false, false, 2, 6, 14);
+        MiningSkills.Target coal = new MiningSkills.Target("coal", p2 -> p2.equals("coal_ore"), false, false, 1, 6, 96);
+        MiningSkills.Target stone = new MiningSkills.Target("stone", "stone"::equals, false, true, 1, 16, null);
+        MiningSkills.Target deep = new MiningSkills.Target("deepslate", "deepslate"::equals, false, true, 1, 16, null);
+        MiningSkills.Target any = new MiningSkills.Target("ores", p2 -> p2.endsWith("_ore"), false, false, 1, 8, null);
+        check(MineHub.defaultLevel(iron) == -58 && MineHub.defaultLevel(any) == -58 && MineHub.defaultLevel(deep) == -58
+                && MineHub.defaultLevel(null) == -58, "ores and deepslate come from the strips at -58");
+        check(MineHub.defaultLevel(coal) == 48 && MineHub.defaultLevel(stone) == MineHub.STONE_Y, "coal and stone from strips part way down");
+        check(MineHub.Mine.levelOf("-58@2") == -58 && MineHub.Mine.levelOf("16") == 16, "strip levels");
         System.out.println(fails == 0 ? "ALL PASSED" : fails + " FAILED");
         System.exit(fails == 0 ? 0 : 1);
     }

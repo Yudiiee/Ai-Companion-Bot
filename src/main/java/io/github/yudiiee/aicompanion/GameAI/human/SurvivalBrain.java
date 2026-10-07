@@ -435,7 +435,8 @@ public final class SurvivalBrain {
                 && (bot.level().getDefaultClockTime() % 24000L) < 23000L, false);
 
         if (pick == 0 && inv.logs + inv.planks / 4 < 3) return Task.WOOD;
-        if (pick > 0) {
+        // ore lying around only tempts it outside the Overworld: there, ore comes out of the mine
+        if (pick > 0 && !onServer(server, () -> Home.overworld(bot.level()), true)) {
             BlockPos ore = onServer(server, () -> findOre(bot, b, null, pick, 10), null);
             if (ore != null) return Task.ORE;
         }
@@ -482,9 +483,30 @@ public final class SurvivalBrain {
         if (chopped == 0) b.blacklist.put(log, System.currentTimeMillis() + 5 * 60_000L);
     }
 
+    /** When it last went down the mine on its own (it doesn't spend all day down there). */
+    private static final Map<UUID, Long> LAST_MINE_TRIP = new ConcurrentHashMap<>();
+
+    /** In the Overworld, stone and ore only come out of the mine: a trip down it (now and then, unless told to). */
+    private static boolean mineTrip(MinecraftServer server, ServerPlayer bot, Brain b, String what, int count) throws InterruptedException {
+        if (!onServer(server, () -> Home.overworld(bot.level()), false)) return false;
+        long now = System.currentTimeMillis();
+        boolean told = b.commanded != null;
+        if (!told && now - LAST_MINE_TRIP.getOrDefault(bot.getUUID(), 0L) < 10 * 60_000L) {
+            doExplore(server, bot, b);
+            return true;
+        }
+        LAST_MINE_TRIP.put(bot.getUUID(), now);
+        MiningSkills.Target t = MiningSkills.resolve(what);
+        if (t == null) return false;
+        MineHub.mineFor(server, bot, b, t, count, false);
+        Storage.afterMining(server, bot, b);
+        return true;
+    }
+
     private static void doStone(MinecraftServer server, ServerPlayer bot, Brain b) throws InterruptedException {
         int pick = onServer(server, () -> Inv.of(bot).pickaxeTier, 0);
         if (pick == 0) { doWood(server, bot, b); return; }
+        if (mineTrip(server, bot, b, "stone", 32)) return;
         BlockPos stone = onServer(server, () -> {
             Protection.Context ctx = Protection.scan(bot, 12);
             return findBlock(bot, b, SurvivalBrain::isStone, 12, 6, p -> !ctx.isProtected(bot.level(), p));
@@ -514,6 +536,7 @@ public final class SurvivalBrain {
         int pick = onServer(server, () -> Inv.of(bot).pickaxeTier, 0);
         if (pick == 0) { doWood(server, bot, b); return; }
         String wanted = b.wantedOre;
+        if (mineTrip(server, bot, b, wanted == null || wanted.equals("ore") ? "ores" : wanted, wanted == null ? 8 : 6)) return;
         BlockPos ore = onServer(server, () -> findOre(bot, b, wanted, pick, 16), null);
         if (ore == null) {
             if (wanted != null && b.commanded == Task.ORE) {

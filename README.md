@@ -22,10 +22,10 @@ on their own out of the box, and you can hook them up to an LLM for real convers
   checks every spot inside is bright enough that nothing spawns.
 - **Chests it remembers.** It uses what's in its pockets first, then the chests, and only then
   goes out to gather.
-- **A real mine.** `dig down` makes a lit staircase from a fixed entrance to y -58 with a landing
-  at the bottom. Ore jobs go down the same stairs to the right level for each ore and strip mine
-  there, with branches every 3 blocks and torches every 6. Caves it breaks into get lit, or sealed
-  off if there's water or lava in them. Each trip carries on where the last one stopped.
+- **One mine for the whole town.** Nobody digs for stone or ore anywhere else: a 3×3 staircase goes down to y -58,
+  three strip mines run out from a hub at the bottom (thousands of blocks, branches every 3, 20 long), a torch
+  every 6 blocks everywhere, and each companion takes its own strip. Caves it breaks into get lit, or sealed off
+  if there's water or lava in them, and each trip carries on where the last one stopped.
 - **Food farm.** A 9×9 plot beside the house with water, torches and crops (carrots/potatoes, then
   wheat, then beetroot). It harvests, replants, bakes bread and keeps enough food on hand.
 - **A house of its own.** Each companion builds one of six medieval houses as its home (cottage, townhouse,

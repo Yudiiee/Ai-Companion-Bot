@@ -50,30 +50,38 @@ and makes each companion feel like another person playing with you.
 - Ores: it only grabs ones lying in the open within ~16 blocks; otherwise it goes down its mine for them (below).
   No more random holes towards buried ore.
 
-**The mine (dig down, then strip mine by ore)**
-- `dig down` / `dig a staircase` / `make a mine` / `dig to bedrock` / `dig down to y -40`: it fixes the spot it's
-  standing on as the mine entrance (walking out of the house first) and digs a staircase down, 1 wide and 3 high,
-  one block down per step, in the direction *you* face, with a torch on the wall at head height every 6 steps. At
-  the bottom (y -58 by default) it clears a lit 3×3×3 landing, remembers it, says what it found on the way and
-  asks what to mine, and waits there (up to 15 minutes) for the answer.
-- Each ore has its level: diamonds and redstone y -58, gold -16, lapis 0, iron 14, copper 48, coal up in the hills
-  (96, or just under the surface where it's lower), emeralds only in mountain biomes (peaks, slopes, windswept hills,
-  meadows, groves; it tells you to take it to some mountains otherwise), ancient debris y 15 in the Nether only
-  (needs a diamond pickaxe).
-- `mine diamonds`, `get iron`, `strip mine for gold`, `mine diamonds at y -58`, `strip mine at y 20`: it empties its
-  pockets at home if they're filling up, walks to its mine, down the same stairs to that level (digging more steps if
-  they don't go that deep yet), then strip mines: a straight 1×2 trunk off to the side of the stairs, with 1×2
-  branches every 3 blocks, 24 long, both sides, and a torch every 6 blocks in the trunk and every branch. It mines
-  every ore that shows in the walls, then walks back out along the trunk and up the stairs, and puts the loot away.
-- Next trip it carries on where the tunnel ended last time. If a tunnel is blocked for good (lava, water) it starts
-  a new one on the other side of the stairs next time.
+**The mine** (one per town, shared by everyone)
+- Stone and ore only ever come out of the mine. In the Overworld, every companion that needs stone, cobblestone,
+  deepslate, andesite, diorite, granite, tuff, calcite or any ore (for a build, a tool, smelting, "get 32 stone",
+  "mine 10 iron", or on its own) goes down the mine for it; nobody digs random holes. Logs, dirt, sand, gravel and
+  clay are still gathered outside, and the Nether works as before.
+- There's one mine per town (the town their homes are by), or one for all of them before there's a town. The
+  first companion that needs it picks the entrance: near where it is, on dry ground, clear of the town's buildings,
+  everyone's builds and homes, with the first stretch of the stairs clear too. A mine a companion dug for itself
+  before (1.6 and earlier) becomes the shared one, and the shared one becomes the town's when a town goes up.
+- The stairs are 3 wide and 3 high, a block down per step, with a torch on the wall every 6 steps, down to y -58.
+  One companion digs them further at a time; the others wait and then walk on down. `dig down` / `make a mine`
+  digs (or carries on with) the shared staircase.
+- At the bottom: a lit 3×3×3 hub. Three strip mines run out of it (straight on, left and right), on and on, a trip
+  at a time, so they reach thousands of blocks. Each has branches every 3 blocks on both sides, 20 long, and a
+  torch every 6 blocks in the strip and every branch (no branches for the first 22 blocks, so the three strips'
+  branches never dig into each other). Each companion takes a strip of its own (the one it had last time, else the
+  shortest free one); with all three taken, it waits for one.
+- Ores, deepslate and tuff come from the strips at -58. Coal and copper aren't found that deep, so they come from a
+  strip off the same staircase at y 48 (or 8 below the entrance if that's lower), and plain stone and its kinds
+  from one at y 16. `strip mine at y 20` digs a strip off the staircase at that level.
+- A trip goes until it has what it came for (counting what's in its pockets), its pockets are full, it's hurt,
+  its pickaxe breaks or 40 minutes are up; then it walks back along the strip, through the hub and up the stairs,
+  and puts the loot away. Next trip it carries on where the strip ended. A strip that runs into lava or water is
+  finished; the others carry on.
+- On its own (no job), a companion makes a mine trip at most every 10 minutes when it's short of cobblestone.
 - Caves: when a step breaks into a cave it stops, lights the dark spots at the opening (not in its own way), and
   carries on; if the cave has water or lava in it, it blocks the openings up with cobblestone first (it can dig its
   own seals later, it never digs anyone else's blocks).
 - Torches: it takes some along (pockets, then chests, then crafts them from coal/charcoal and sticks, digging a bit
   of coal it can see nearby if needed). Out of torches down there: it says so and carries on.
-- The mine is saved per bot, per world (`<world>/ai-companion/mines.txt`). A level above the mine's entrance (a hill,
-  "at y 100") gets a one-off staircase instead.
+- The mine is saved per world (`<world>/ai-companion/mines.txt`). A level someone asks for above the entrance (a
+  hill, "strip mine at y 100") gets a one-off staircase instead.
 - Safety: never digs a block touching lava or (in tunnels) water, never the block it stands on, never below y -59,
   never bedrock/spawners/chests; re-mines gravel and sand that falls in; clears the line of sight before mining so it
   never breaks something behind the target; waits out fights, eats, and stops when hurt, full or out of pickaxes.
@@ -408,4 +416,4 @@ It hooks into: `AICompanion` (registration, hit reaction), `AICompanionClient` (
 Town and money: `PriceBook` (the price list), `Economy` (trading, tabs, shops), `CityPlan` (the layout), `City` (the
 town: founding, building it together, helping each other, the temple).
 
-Build: `./gradlew build` → `build/libs/ai-companion-1.6.0+26.3.jar`.
+Build: `./gradlew build` → `build/libs/ai-companion-1.7.0+26.3.jar`.

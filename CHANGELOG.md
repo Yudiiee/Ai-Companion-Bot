@@ -1,5 +1,20 @@
 # AI Companion - Changelog
 
+## 1.7.0 (Minecraft 26.3)
+
+- One mine per town, shared by every companion: nobody digs for stone or ore anywhere else in the Overworld any more.
+  Everything that takes a pickaxe (stone, cobblestone, deepslate, andesite, granite, diorite, tuff, calcite, every
+  ore) comes out of the mine, whether it's for a build, a tool, smelting, a request or on its own. Logs, dirt, sand,
+  gravel and clay are still gathered outside.
+- The mine's staircase is 3 wide and 3 high, down to y -58, a torch every 6 steps. One companion digs it further at
+  a time; the others wait and walk on down.
+- At the bottom, a lit hub with three strip mines running out of it that go on for as long as they're needed
+  (thousands of blocks), branches every 3 blocks, 20 long, both sides, a torch every 6 blocks. Each companion works
+  a strip of its own. Ores come from the strips at -58; coal and copper (not found that deep) from a strip at y 48,
+  plain stone from one at y 16, both off the same staircase.
+- The entrance goes somewhere clear of the town, builds and homes. An existing per-bot mine becomes the shared one.
+- A mining trip counts what's in its pockets, so "get 32 stone" comes back with 32.
+
 ## 1.6.0 (Minecraft 26.3)
 
 - A network of towns. Once the newest town is about 70% built (or when you say "build another city" / "expand the

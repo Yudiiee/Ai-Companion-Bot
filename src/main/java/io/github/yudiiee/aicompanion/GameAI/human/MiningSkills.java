@@ -370,7 +370,7 @@ public final class MiningSkills {
         }
         Matcher fm = STRIP_FOR.matcher(m);
         if (want == null && fm.find()) want = resolve(fm.group(1));
-        int y = want != null && want.stripY() != null ? want.stripY() : DEFAULT_STRIP_Y;
+        int y = MineHub.defaultLevel(want);
         Integer yOverride = null;
         Matcher ym = STRIP_Y.matcher(m);
         if (ym.find()) yOverride = y = Integer.parseInt(ym.group(1));
@@ -407,6 +407,11 @@ public final class MiningSkills {
     /** @param quiet don't announce the total at the end (someone else will, e.g. when handing it over) */
     static void collect(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, Target t, int count, boolean quiet)
             throws InterruptedException {
+        // stone and ore come out of the mine, never just anywhere
+        if (onServer(server, () -> MineHub.underground(bot, t), false)) {
+            MineHub.mineFor(server, bot, b, t, count, quiet);
+            return;
+        }
         long end = System.currentTimeMillis() + 20 * 60_000L;
         int got = 0, misses = 0;
         if (t.tier() > 0 && !ensurePickaxe(server, bot, b, t.tier())) return;
@@ -628,7 +633,7 @@ public final class MiningSkills {
                                         Map<String, Integer> found, Target want, int[] got) throws InterruptedException {
         for (int k = 0; k < 16 && SurvivalBrain.canContinue(b); k++) {
             int tier = pickTier(server, bot);
-            BlockPos ore = onServer(server, () -> nearestOreInReach(bot, b, tier), null);
+            BlockPos ore = onServer(server, () -> nearestOreInReach(bot, b, tier, want), null);
             if (ore == null) return;
             String path = onServer(server, () -> blockPath(bot.level().getBlockState(ore)), "");
             if (dig(server, bot, b, ore, false, 0)) {
@@ -732,6 +737,13 @@ public final class MiningSkills {
     }
 
     private static BlockPos nearestOreInReach(ServerPlayer bot, SurvivalBrain.Brain b, int tier) {
+        return nearestOreInReach(bot, b, tier, null);
+    }
+
+    /** Ore in reach, or (with {@code want}: andesite, granite, tuff...) a block of what's wanted showing in the tunnel walls. */
+    private static BlockPos nearestOreInReach(ServerPlayer bot, SurvivalBrain.Brain b, int tier, Target want) {
+        boolean wantBlocks = want != null && want.stripY() == null && !want.label().equals("stone") && !want.label().equals("deepslate")
+                && !want.label().equals("ores");
         ServerLevel level = bot.level();
         BlockPos o = bot.blockPosition();
         BlockPos best = null;
@@ -740,7 +752,7 @@ public final class MiningSkills {
             BlockPos p = o.offset(dx, dy, dz);
             if (p.equals(o.below())) continue;
             String path = blockPath(level.getBlockState(p));
-            if (!isOreId(path) || tierFor(path) > tier) continue;
+            if (!(isOreId(path) || (wantBlocks && want.test(path))) || tierFor(path) > tier) continue;
             double d = bot.position().distanceTo(Vec3.atCenterOf(p));
             if (d > REACH || d >= bd) continue;
             if (SurvivalBrain.blacklisted(b, p) || !SurvivalBrain.exposed(level, p) || fluidNear(level, p) == 2) continue;
