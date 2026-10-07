@@ -264,9 +264,22 @@ and makes each companion feel like another person playing with you.
   Stonehaven". `/humanlike city off` stops them doing it by themselves.
 - The layout: a 15x15 plaza with a fountain in the middle, four avenues (5 wide, stone brick edges, cobblestone,
   street lamps every 8 blocks, following the ground a block at a time, bridging water), a warehouse, a shop for
-  each companion (at least three), three community farms, a temple at the end of the north avenue, a mall at the
-  end of the east one, an amphitheatre at the end of the south one, and four town houses. Every building faces the
-  road. It goes up in that order, each road reaching a building before the building does.
+  each companion (at least three), three community farms, the temple at the end of one avenue and the PvP arena at
+  the end of the opposite one, a mall and an amphitheatre along the other two, and four town houses. Every
+  building faces the road. It goes up in that order, each road reaching a building before the building does. The
+  two avenues without a landmark stay open at the end: that's where roads to other towns join.
+- The network: when the newest town is about 70% built (or you say "build another city", "expand the network",
+  "build a second town called Riverbend"), they look down every open avenue end, newest town first, for a spot
+  64 to 384 blocks on that's dry, flattish and clear of builds and other towns (walking out that way if the land
+  isn't loaded). The new town is turned so one of its open avenues points back down the road, with its temple and
+  arena on the other axis; the road between the towns is built first, starting at the height the old avenue ended.
+  Older towns' unfinished pieces come before newer ones'. "how's the town going" lists every town.
+- The temple (by iSthz) has a nether portal: once its obsidian frame is real obsidian, a companion with a flint and
+  steel (or flint and iron) lights it. Until then the frame is dark stone, swapped for obsidian when you bring some.
+- The PvP arena (a big sandstone arena with stands and banners) is where duels happen: "fight me" gets "1v1 me at
+  the arena (x y z)", the bot walks there and waits up to four minutes, and the fight starts once you're both on the
+  arena floor. With no arena built nearby it fights where you are. Once a day or so, a bot in town asks whoever's
+  around if they're up for a duel there. Towns from 1.5.0 get an arena past their south end.
 - Each companion takes the next piece nobody's working on (its own shop is its to build) and builds it like any
   design. What it can't get, it asks the others for in chat ("Ovi, J1mbers: anyone got 96 stone bricks? need it for
   the temple"); a free companion takes the request, gets or makes it and hands it over or leaves it in the
@@ -281,12 +294,12 @@ and makes each companion feel like another person playing with you.
   diamonds out of the till (the barrel on the counter). A starving companion with no food, or one short of
   something for a build, buys it off another companion's shelf (spending at most half its diamonds) and leaves the
   diamonds in the till.
-- Chat: "how's the town going", "where's the temple / mall / your shop", "work on the town" (also gives pieces that
+- Chat: "how's the town going", "where's the temple / arena / mall / your shop", "work on the town" (also gives pieces that
   got skipped another go), "forget the town" (what's built stays; they won't start another one by themselves).
 - Saved per world: `<world>/ai-companion/city.txt` (the plan and how far along it is), `economy.txt` (tabs, takings).
-  The designs are `city_plaza`, `city_temple`, `city_amphitheatre`, `city_shop`, `city_mall`, `city_farm` and
-  `city_warehouse` in the schematics folder (made by `tools/make_city_schematics.py`; edit them and new towns use
-  your versions).
+  The designs are `city_plaza`, `city_amphitheatre`, `city_shop`, `city_mall`, `city_farm`, `city_warehouse`,
+  `town_temple` and `town_arena` in the schematics folder (made by `tools/make_city_schematics.py` and
+  `tools/prepare_town_designs.py`; edit them and new towns use your versions).
 
 **Chests / storage**
 - The chest in the house becomes the storage chest. `use this chest` (while looking at a chest or barrel) makes that
@@ -395,4 +408,4 @@ It hooks into: `AICompanion` (registration, hit reaction), `AICompanionClient` (
 Town and money: `PriceBook` (the price list), `Economy` (trading, tabs, shops), `CityPlan` (the layout), `City` (the
 town: founding, building it together, helping each other, the temple).
 
-Build: `./gradlew build` → `build/libs/ai-companion-1.5.0+26.3.jar`.
+Build: `./gradlew build` → `build/libs/ai-companion-1.6.0+26.3.jar`.

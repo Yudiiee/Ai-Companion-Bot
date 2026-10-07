@@ -380,7 +380,8 @@ SIDE = {
 }
 
 MAKERS = {
-    'city_plaza': plaza, 'city_temple': temple, 'city_amphitheatre': amphitheatre, 'city_shop': shop,
+    # (the temple and the PvP arena come from tools/prepare_town_designs.py: town_temple, town_arena)
+    'city_plaza': plaza, 'city_amphitheatre': amphitheatre, 'city_shop': shop,
     'city_mall': mall, 'city_farm': farm, 'city_warehouse': warehouse,
 }
 

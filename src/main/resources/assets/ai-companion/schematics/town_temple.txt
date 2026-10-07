@@ -1,0 +1,5 @@
+name: temple
+aliases: town temple, grand temple, portal temple, shrine
+about: A ruined-stone temple around a nether portal. The chest in front of the portal is for offerings of food.
+ground: 0
+front: south

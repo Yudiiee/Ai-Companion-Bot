@@ -17,5 +17,9 @@ split from a medieval village design by ajmed.
 The bundled iron farm design (src/main/resources/assets/ai-companion/schematics/iron_farm.nbt) is by
 F3deMatt25.
 
+The bundled town temple (src/main/resources/assets/ai-companion/schematics/town_temple.nbt) is by iSthz (an
+offering chest added, empty space set to air). The bundled PvP arena (town_arena.nbt) was supplied by Udit
+(author not recorded in the file; the natural ground it was saved with was removed).
+
 The language models used by the chat intent system are downloaded at first launch
 from the original AI-Player release assets.

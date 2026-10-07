@@ -1,5 +1,0 @@
-name: temple
-aliases: town temple, church, shrine
-about: A stone temple with a columned porch, pews and an altar. The chest on the altar is for offerings of food.
-ground: 0
-front: south

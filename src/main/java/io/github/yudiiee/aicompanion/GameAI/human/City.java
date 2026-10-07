@@ -129,14 +129,30 @@ public final class City {
         }
     }
 
+    /** Road pieces between two towns (the "arm" of their plots). */
+    static final int HIGHWAY = 4;
+
     static final class Town {
         final String dim, name, founder;
         final int cx, cz;
         volatile int cy;
         final long founded;
+        /** Its number in the network (plots are numbered from id * 1000). */
+        final int id;
+        /** The avenue with the temple at its end (the arena is at the opposite end). */
+        final int templeArm;
+        /** The town it was built out from (-1: the first), and the height the road from there starts at. */
+        final int parent, fromY;
+        /** Avenues left open at the end for roads to other towns, and the ones already joined up. */
+        final Set<Integer> gates = ConcurrentHashMap.newKeySet(), linked = ConcurrentHashMap.newKeySet();
         final List<Plot> plots = new CopyOnWriteArrayList<>();
 
         Town(String dim, int cx, int cy, int cz, String name, String founder, long founded) {
+            this(dim, cx, cy, cz, name, founder, founded, 0, 0, -1, cy);
+        }
+
+        Town(String dim, int cx, int cy, int cz, String name, String founder, long founded, int id, int templeArm, int parent,
+             int fromY) {
             this.dim = dim;
             this.cx = cx;
             this.cy = cy;
@@ -144,6 +160,68 @@ public final class City {
             this.name = name;
             this.founder = founder;
             this.founded = founded;
+            this.id = id;
+            this.templeArm = templeArm;
+            this.parent = parent;
+            this.fromY = fromY;
+        }
+
+        String line() {
+            return "town|" + dim + "|" + cx + "|" + cy + "|" + cz + "|" + name.replace('|', ' ') + "|" + founder + "|" + founded + "|" + id
+                    + "|" + templeArm + "|" + set(gates) + "|" + set(linked) + "|" + parent + "|" + fromY;
+        }
+
+        private static String set(Set<Integer> s) {
+            if (s.isEmpty()) return "-";
+            List<String> out = new ArrayList<>();
+            for (int i : new TreeSet<>(s)) out.add(String.valueOf(i));
+            return String.join(",", out);
+        }
+
+        /** A saved town line; {@code index}: its place in the file (for towns saved before there were several). */
+        static Town parse(String line, int index) {
+            String[] x = line.split("\\|", -1);
+            if (x.length < 8) return null;
+            try {
+                int cy = Integer.parseInt(x[3]);
+                if (x.length < 14) {
+                    // a town from before the network: temple north, mall east, amphitheatre south; the west end is open
+                    Town t = new Town(x[1], Integer.parseInt(x[2]), cy, Integer.parseInt(x[4]), x[5], x[6], Long.parseLong(x[7]),
+                            index, 0, -1, cy);
+                    t.gates.add(3);
+                    return t;
+                }
+                Town t = new Town(x[1], Integer.parseInt(x[2]), cy, Integer.parseInt(x[4]), x[5], x[6], Long.parseLong(x[7]),
+                        Integer.parseInt(x[8]), Integer.parseInt(x[9]), Integer.parseInt(x[12]), Integer.parseInt(x[13]));
+                for (String g : x[10].split(",")) if (g.matches("[0-3]")) t.gates.add(Integer.parseInt(g));
+                for (String g : x[11].split(",")) if (g.matches("[0-3]")) t.linked.add(Integer.parseInt(g));
+                return t;
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+
+        /** How far out an avenue's road reaches from the plaza's middle (0 if it has none). */
+        int reach(int arm) {
+            int[] v = CityPlan.vec(CityPlan.DIRS[arm]);
+            int far = 0;
+            for (Plot p : plots) {
+                if (!p.road() || p.arm != arm) continue;
+                int a = v[0] > 0 ? p.x0 + p.w - 1 - cx : v[0] < 0 ? cx - p.x0 : v[1] > 0 ? p.z0 + p.l - 1 - cz : cz - p.z0;
+                far = Math.max(far, a);
+            }
+            return far;
+        }
+
+        /** Built and to build, in that order of the town's own pieces (roads to other towns don't count). */
+        double progress() {
+            int all = 0, done = 0;
+            for (Plot p : plots) {
+                if (p.arm == HIGHWAY) continue;
+                all++;
+                if (p.done()) done++;
+            }
+            return all == 0 ? 1 : (double) done / all;
         }
 
         BlockPos center() { return new BlockPos(cx, cy, cz); }
@@ -172,7 +250,8 @@ public final class City {
         }
     }
 
-    private static volatile Town town;
+    /** Every town, oldest first. */
+    static final List<Town> TOWNS = new CopyOnWriteArrayList<>();
     /** Told to forget the town: no new one unless they're asked for it. */
     private static volatile boolean forgotten;
     private static volatile Path loadedFrom;
@@ -190,7 +269,7 @@ public final class City {
         }
         if (f == null || f.equals(loadedFrom)) return;
         loadedFrom = f;
-        town = null;
+        TOWNS.clear();
         forgotten = false;
         if (!Files.isRegularFile(f)) return;
         try {
@@ -198,64 +277,132 @@ public final class City {
             for (String line : Files.readAllLines(f, StandardCharsets.UTF_8)) {
                 if (line.startsWith("forgotten")) forgotten = true;
                 if (line.startsWith("town|")) {
-                    String[] x = line.split("\\|", -1);
-                    if (x.length < 8) continue;
-                    t = new Town(x[1], Integer.parseInt(x[2]), Integer.parseInt(x[3]), Integer.parseInt(x[4]), x[5], x[6],
-                            Long.parseLong(x[7]));
+                    t = Town.parse(line, TOWNS.size());
+                    if (t != null) TOWNS.add(t);
                 } else if (line.startsWith("plot|") && t != null) {
                     Plot p = Plot.parse(line);
                     if (p != null) t.plots.add(p);
                 }
             }
-            town = t;
         } catch (IOException | RuntimeException e) {
             LOGGER.warn("[city] couldn't read {}: {}", f, e.toString());
         }
     }
 
     static synchronized void save() {
-        Town t = town;
         Path f = file();
         if (f == null) return;
         try {
-            if (t == null) {
+            if (TOWNS.isEmpty()) {
                 // a town somebody told them to forget: they don't go founding another by themselves
                 if (forgotten) Files.write(f, List.of("forgotten"), StandardCharsets.UTF_8);
                 else Files.deleteIfExists(f);
                 return;
             }
             List<String> out = new ArrayList<>();
-            out.add("town|" + t.dim + "|" + t.cx + "|" + t.cy + "|" + t.cz + "|" + t.name.replace('|', ' ') + "|" + t.founder + "|" + t.founded);
-            for (Plot p : t.plots) out.add(p.line());
+            for (Town t : TOWNS) {
+                out.add(t.line());
+                for (Plot p : t.plots) out.add(p.line());
+            }
             Files.write(f, out, StandardCharsets.UTF_8);
         } catch (IOException e) {
             LOGGER.warn("[city] couldn't save {}: {}", f, e.toString());
         }
     }
 
-    /** The town, or null if there isn't one yet. */
+    /** The newest town, or null if there isn't one yet. */
     static Town town() {
         load();
-        return town;
+        return TOWNS.isEmpty() ? null : TOWNS.get(TOWNS.size() - 1);
     }
 
-    /** The town, if it's in this dimension. Server thread. */
+    /** Every town, oldest first. */
+    static List<Town> towns() {
+        load();
+        return TOWNS;
+    }
+
+    /** The newest town in this dimension, or null. */
     static Town townIn(ServerLevel level) {
-        Town t = town();
-        return t != null && t.dim.equals(Home.dim(level)) ? t : null;
+        String dim = Home.dim(level);
+        List<Town> all = towns();
+        for (int i = all.size() - 1; i >= 0; i--) if (all.get(i).dim.equals(dim)) return all.get(i);
+        return null;
+    }
+
+    /** The town nearest a spot in this dimension, or null. */
+    static Town nearest(ServerLevel level, BlockPos at) {
+        String dim = Home.dim(level);
+        Town best = null;
+        double bd = Double.MAX_VALUE;
+        for (Town t : towns()) {
+            if (!t.dim.equals(dim)) continue;
+            double d = t.center().distSqr(at);
+            if (d < bd) { bd = d; best = t; }
+        }
+        return best;
+    }
+
+    /** The town with this bot's shop in it (its finished one nearest {@code at}), else the town nearest. */
+    static Town shopTown(ServerLevel level, BlockPos at, String bot) {
+        String dim = Home.dim(level);
+        Town best = null;
+        double bd = Double.MAX_VALUE;
+        for (Town t : towns()) {
+            if (!t.dim.equals(dim)) continue;
+            Plot s = t.shopOf(bot);
+            if (s == null || !s.done()) continue;
+            double d = t.center().distSqr(at);
+            if (d < bd) { bd = d; best = t; }
+        }
+        return best != null ? best : nearest(level, at);
+    }
+
+    /** The town a piece belongs to. */
+    static Town townOf(Plot p) {
+        for (Town t : towns()) if (t.plots.contains(p)) return t;
+        return null;
+    }
+
+    /** A finished building of a kind in the town nearest {@code at} that has one (within {@code range}), or null. */
+    static Plot nearestBuilt(ServerLevel level, BlockPos at, String kind, int range) {
+        String dim = Home.dim(level);
+        Plot best = null;
+        double bd = (double) range * range;
+        for (Town t : towns()) {
+            if (!t.dim.equals(dim)) continue;
+            Plot p = t.built(kind);
+            if (p == null) continue;
+            double d = new BlockPos(p.midX(), p.y == NO_Y ? t.cy : p.y, p.midZ()).distSqr(at);
+            if (d < bd) { bd = d; best = p; }
+        }
+        return best;
     }
 
     // ------------------------------------------------------------------------
     // The designs it's built from
     // ------------------------------------------------------------------------
 
-    static final String[] KINDS = {"plaza", "warehouse", "shop", "farm", "temple", "mall", "amphitheatre"};
+    static final String[] KINDS = {"plaza", "warehouse", "shop", "farm", "temple", "arena", "mall", "amphitheatre"};
+
+    /** The design files for a kind of building, the preferred one first. */
+    static String[] filesFor(String kind) {
+        return switch (kind) {
+            case "temple" -> new String[]{"town_temple.nbt", "city_temple.nbt"};
+            case "arena" -> new String[]{"town_arena.nbt"};
+            default -> new String[]{"city_" + kind + ".nbt"};
+        };
+    }
 
     /** The town's designs by kind (from the schematics folder), plus up to four houses. Job thread (reads files). */
     static Map<String, CityPlan.Design> designs(List<CityPlan.Design> houses) {
         Map<String, CityPlan.Design> out = new LinkedHashMap<>();
         for (String k : KINDS) {
-            Blueprints.Entry e = Blueprints.byFile("city_" + k + ".nbt");
+            Blueprints.Entry e = null;
+            for (String f : filesFor(k)) {
+                e = Blueprints.byFile(f);
+                if (e != null) break;
+            }
             if (e == null) continue;
             try {
                 Schematic s = Blueprints.plan(e);
@@ -315,6 +462,22 @@ public final class City {
     }
 
     /** How good a place is for the town ({x, y, z, score}), or null if it won't do. Server thread. */
+    /** Within {@code margin} of any piece of a town in this dimension? */
+    static boolean overlapsTown(String dim, int x0, int z0, int x1, int z1, int margin) {
+        for (Town t : towns()) {
+            if (!t.dim.equals(dim)) continue;
+            for (Plot p : t.plots) {
+                if (p.x0 - margin <= x1 && p.x0 + p.w - 1 + margin >= x0 && p.z0 - margin <= z1 && p.z0 + p.l - 1 + margin >= z0) return true;
+            }
+        }
+        return false;
+    }
+
+    /** Too little loaded to judge (a rating with this mark isn't a real one). */
+    static boolean unknown(int[] r) {
+        return r != null && r.length > 4 && r[4] == 1;
+    }
+
     static int[] rateSite(ServerLevel level, int cx, int cz, int nearY, int[] bounds) {
         String dim = Home.dim(level);
         int bx0 = cx + bounds[0] - 6, bz0 = cz + bounds[1] - 6, bx1 = cx + bounds[2] + 6, bz1 = cz + bounds[3] + 6;
@@ -326,6 +489,7 @@ public final class City {
             BlockPos m = h.middle();
             if (m.getX() >= bx0 - 8 && m.getX() <= bx1 + 8 && m.getZ() >= bz0 - 8 && m.getZ() <= bz1 + 8) return null;
         }
+        if (overlapsTown(dim, bx0, bz0, bx1, bz1, 16)) return null;
         List<Integer> ys = new ArrayList<>();
         int samples = 0, water = 0, unloaded = 0;
         for (int x = bx0; x <= bx1; x += 8) {
@@ -337,7 +501,9 @@ public final class City {
                 ys.add(c[0]);
             }
         }
-        if (samples == 0 || ys.size() < samples / 3) return null;
+        // too little of it loaded to tell: say so (that's not the same as a bad spot)
+        if (samples == 0 || ys.size() + water < samples / 3) return new int[]{cx, nearY, cz, Integer.MAX_VALUE, 1};
+        if (ys.isEmpty()) return null;
         if (water > samples / 5) return null;
         Collections.sort(ys);
         int med = ys.get(ys.size() / 2);
@@ -379,11 +545,12 @@ public final class City {
      * Lays the town out and remembers it. {@code at}: where the plaza goes (null: the bot finds a
      * spot near everyone's homes). Job thread. Returns the town, or null (and says why).
      */
-    static Town found(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, BlockPos at, String name) {
-        Town existing = town();
-        if (existing != null) {
-            HumanChat.say(server, b.name, "we've already got a town, " + existing.name + ", at " + existing.cx + " " + existing.cz);
-            return null;
+    static Town found(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, BlockPos at, String name)
+            throws InterruptedException {
+        Town existing = onServer(server, () -> townIn(bot.level()), null);
+        if (existing != null && at == null) {
+            // there's a town already: the next one goes up down a road from it
+            return expand(server, bot, b, name);
         }
         List<CityPlan.Design> houses = new ArrayList<>();
         Map<String, CityPlan.Design> d = designs(houses);
@@ -393,10 +560,9 @@ public final class City {
             return null;
         }
         List<String> names = onServer(server, () -> botNames(server), List.of(b.name));
-        List<String> owners = new ArrayList<>();
-        owners.add(b.name);
-        for (String n : names) if (!n.equalsIgnoreCase(b.name)) owners.add(n);
-        List<CityPlan.Lot> lots = CityPlan.layout(plaza, CityPlan.program(d, Math.max(3, owners.size()), houses));
+        List<String> owners = owners(b.name, names);
+        int templeArm = 0;
+        List<CityPlan.Lot> lots = CityPlan.layout(plaza, CityPlan.program(d, Math.max(3, owners.size()), houses, templeArm));
         int[] bounds = CityPlan.bounds(lots);
         int[] site;
         if (at != null) {
@@ -412,28 +578,203 @@ public final class City {
             return null;
         }
         String dim = onServer(server, () -> Home.dim(bot.level()), "");
-        String townName = name != null && !name.isBlank() ? cap(name.trim()) : NAMES[RNG.nextInt(NAMES.length)];
-        Town t = new Town(dim, site[0], site[1], site[2], townName, b.name, System.currentTimeMillis());
-        int shopIndex = 0;
-        for (CityPlan.Lot lot : lots) {
-            String owner = "";
-            if (lot.kind().equals("shop")) {
-                owner = shopIndex < owners.size() ? owners.get(shopIndex) : "";
-                shopIndex++;
-            }
-            int y = lot.kind().equals("plaza") ? site[1] : NO_Y;
-            t.plots.add(new Plot(lot.id(), lot.kind(), lot.file(), site[0] + lot.x0(), site[2] + lot.z0(), lot.w(), lot.l(), lot.face(),
-                    lot.rot(), lot.arm(), y, owner, "todo"));
+        if (overlapsTown(dim, site[0] + bounds[0], site[2] + bounds[1], site[0] + bounds[2], site[2] + bounds[3], 16)) {
+            Town in = onServer(server, () -> nearest(bot.level(), new BlockPos(site[0], site[1], site[2])), null);
+            HumanChat.say(server, b.name, "that's right on top of " + (in == null ? "one of our towns" : in.name)
+                    + ". a new town needs about " + (bounds[2] - bounds[0]) + " blocks clear each way, try further out");
+            return null;
         }
+        Town t = create(dim, site, name, b.name, templeArm, -1, site[1], lots, owners, List.of(), null, -1);
+        if (t == null) return null;
+        LOGGER.info("[city] {} founded {} at {} {} {} ({} pieces)", b.name, t.name, site[0], site[1], site[2], t.plots.size());
+        announce(server, t, b.name, names, null);
+        return t;
+    }
+
+    /** Whose shop is whose: the one who founded the town first, then the others. */
+    private static List<String> owners(String founder, List<String> names) {
+        List<String> owners = new ArrayList<>();
+        owners.add(founder);
+        for (String n : names) if (!n.equalsIgnoreCase(founder)) owners.add(n);
+        return owners;
+    }
+
+    /** Makes a town from a layout (and the road out to it, if any) and remembers it. Null if it can't. */
+    private static Town create(String dim, int[] site, String name, String founder, int templeArm, int parent, int fromY,
+                               List<CityPlan.Lot> lots, List<String> owners, List<Plot> highway, Town from, int gate) {
         synchronized (City.class) {
-            if (town() != null) return null;
-            town = t;
+            load();
+            int id = 0;
+            for (Town o : TOWNS) id = Math.max(id, o.id + 1);
+            String townName = name != null && !name.isBlank() ? cap(name.trim()) : freshName();
+            Town t = new Town(dim, site[0], site[1], site[2], townName, founder, System.currentTimeMillis(), id, templeArm, parent, fromY);
+            for (int g : CityPlan.gates(templeArm)) t.gates.add(g);
+            int n = id * 1000;
+            for (Plot h : highway) {
+                t.plots.add(new Plot(n++, h.kind, h.file, h.x0, h.z0, h.w, h.l, h.face, h.rot, HIGHWAY, NO_Y, "", "todo"));
+            }
+            int shopIndex = 0;
+            for (CityPlan.Lot lot : lots) {
+                String owner = "";
+                if (lot.kind().equals("shop")) {
+                    owner = shopIndex < owners.size() ? owners.get(shopIndex) : "";
+                    shopIndex++;
+                }
+                int y = lot.kind().equals("plaza") ? site[1] : NO_Y;
+                t.plots.add(new Plot(n++, lot.kind(), lot.file(), site[0] + lot.x0(), site[2] + lot.z0(), lot.w(), lot.l(), lot.face(),
+                        lot.rot(), lot.arm(), y, owner, "todo"));
+            }
+            if (from != null && gate >= 0) {
+                from.linked.add(gate);
+                t.linked.add((gate + 2) % 4);
+            }
+            TOWNS.add(t);
             forgotten = false;
             save();
+            return t;
         }
-        LOGGER.info("[city] {} founded {} at {} {} {} ({} pieces)", b.name, townName, site[0], site[1], site[2], t.plots.size());
-        announce(server, t, b.name, names);
-        return t;
+    }
+
+    /** A name no town has yet. */
+    private static String freshName() {
+        List<String> free = new ArrayList<>();
+        for (String n : NAMES) {
+            boolean used = false;
+            for (Town t : TOWNS) if (t.name.equalsIgnoreCase(n)) used = true;
+            if (!used) free.add(n);
+        }
+        if (!free.isEmpty()) return free.get(RNG.nextInt(free.size()));
+        return NAMES[RNG.nextInt(NAMES.length)] + " " + (TOWNS.size() + 1);
+    }
+
+    // ------------------------------------------------------------------------
+    // The network: each new town goes up at the end of a road out of one already there
+    // ------------------------------------------------------------------------
+
+    /** Gates that led nowhere (water, somebody's builds): not tried again this session. */
+    private static final Set<String> DEAD_GATES = ConcurrentHashMap.newKeySet();
+    /** Gates somebody is looking down right now (so two bots don't put two towns in one spot). */
+    private static final Set<String> BUSY_GATES = ConcurrentHashMap.newKeySet();
+    private static volatile long lastNoRoomSaid = 0;
+
+    /**
+     * The next town of the network. It looks at every town's open avenue ends (newest town first),
+     * and for each tries spots straight on down that avenue, from a short road to a long one, for
+     * somewhere dry and flattish with nobody's builds in the way. The new town is turned so one of
+     * its own open avenues faces back down the road, with the temple and the arena on the other
+     * axis; the road between them (5 wide, street lamps) is the first thing built. Job thread.
+     */
+    static Town expand(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, String name) throws InterruptedException {
+        List<CityPlan.Design> houses = new ArrayList<>();
+        Map<String, CityPlan.Design> d = designs(houses);
+        CityPlan.Design plaza = d.get("plaza");
+        if (plaza == null) {
+            HumanChat.say(server, b.name, "can't find the town designs (city_plaza and the rest) in the schematics folder");
+            return null;
+        }
+        List<String> names = onServer(server, () -> botNames(server), List.of(b.name));
+        List<String> owners = owners(b.name, names);
+        String dim = onServer(server, () -> Home.dim(bot.level()), "");
+        List<Town> mine = new ArrayList<>();
+        for (Town t : towns()) if (t.dim.equals(dim)) mine.add(t);
+        Collections.reverse(mine);
+        for (Town from : mine) {
+            for (int g : new TreeSet<>(from.gates)) {
+                String key = from.id + ":" + g;
+                if (from.linked.contains(g) || DEAD_GATES.contains(key)) continue;
+                if (!BUSY_GATES.add(key)) continue;
+                try {
+                int in = (g + 2) % 4;
+                // the temple on one side of the road coming in, the arena on the other; which side alternates
+                int templeArm = (from.id % 2 == 0) ? (in + 1) % 4 : (in + 3) % 4;
+                List<CityPlan.Lot> lots = CityPlan.layout(plaza, CityPlan.program(d, Math.max(3, owners.size()), houses, templeArm));
+                int[] bounds = CityPlan.bounds(lots);
+                int reachNew = reach(lots, in), reachOld = from.reach(g);
+                if (reachOld <= 0) reachOld = Math.max(plaza.sx(), plaza.sz()) / 2;
+                int[] v = CityPlan.vec(CityPlan.DIRS[g]);
+                int[] best = null;
+                int bestGap = 0;
+                boolean unsure = false;
+                // twice: from where it stands, then (if too little of it was loaded to tell) after walking out that way
+                for (int look = 0; look < 2 && best == null; look++) {
+                    if (look == 1) {
+                        if (!unsure || !SurvivalBrain.canContinue(b)) break;
+                        int out = reachOld + 160;
+                        BlockPos toward = new BlockPos(from.cx + v[0] * out, from.cy, from.cz + v[1] * out);
+                        SurvivalBrain.maybeSay(server, b, "gonna go look at the land " + CityPlan.DIRS[g] + " of " + from.name, 0.7);
+                        walk(server, bot, b, toward, 8, 200);
+                        unsure = false;
+                    }
+                    for (int gap = 64; gap <= 384; gap += 32) {
+                        int[] c = spotFor(from, g, reachOld, gap, reachNew);
+                        int cx = c[0], cz = c[1];
+                        final int fcy = from.cy;
+                        int[] r = onServer(server, () -> rateSite(bot.level(), cx, cz, fcy, bounds), null);
+                        if (r == null) continue;
+                        if (unknown(r)) { unsure = true; continue; }
+                        r[3] += gap / 16; // shorter roads are better
+                        if (best == null || r[3] < best[3]) { best = r; bestGap = gap; }
+                        if (r[3] < 50) break;
+                    }
+                }
+                if (best == null) {
+                    if (!unsure) DEAD_GATES.add(key); // water or builds all the way: don't keep looking there
+                    continue;
+                }
+                if (from.linked.contains(g)) continue;
+                List<Plot> road = highway(from, g, reachOld, bestGap);
+                Town t = create(dim, best, name, b.name, templeArm, from.id, from.cy, lots, owners, road, from, g);
+                if (t == null) return null;
+                LOGGER.info("[city] {} started {} {} of {} ({} block road)", b.name, t.name, CityPlan.DIRS[g], from.name, bestGap);
+                announce(server, t, b.name, names, from);
+                return t;
+                } finally {
+                    BUSY_GATES.remove(key);
+                }
+            }
+        }
+        long now = System.currentTimeMillis();
+        if (now - lastNoRoomSaid > 60 * 60_000L) {
+            lastNoRoomSaid = now;
+            HumanChat.say(server, b.name, "couldn't find room for another town down any of our roads (water, builds, or too far to see)."
+                    + " stand somewhere clear and say \"build a city here\"");
+        }
+        return null;
+    }
+
+    /**
+     * Where the next town's plaza goes: straight on down avenue {@code g}, so that the road from the
+     * end of this town's avenue ({@code reachOld} out), {@code gap} blocks long, ends right where the
+     * new town's own avenue back ({@code reachNew} long) begins. {x, z}.
+     */
+    static int[] spotFor(Town from, int g, int reachOld, int gap, int reachNew) {
+        int[] v = CityPlan.vec(CityPlan.DIRS[g]);
+        int dist = reachOld + gap + reachNew + 1;
+        return new int[]{from.cx + v[0] * dist, from.cz + v[1] * dist};
+    }
+
+    /** How far out an avenue reaches in a layout (local coordinates). */
+    static int reach(List<CityPlan.Lot> lots, int arm) {
+        int[] v = CityPlan.vec(CityPlan.DIRS[arm]);
+        int far = 0;
+        for (CityPlan.Lot l : lots) {
+            if (!l.road() || l.arm() != arm) continue;
+            int a = v[0] > 0 ? l.x1() : v[0] < 0 ? -l.x0() : v[1] > 0 ? l.z1() : -l.z0();
+            far = Math.max(far, a);
+        }
+        return far;
+    }
+
+    /** The road from the end of a town's avenue out {@code gap} blocks, in pieces (world coordinates). */
+    static List<Plot> highway(Town from, int arm, int reachOld, int gap) {
+        List<Plot> out = new ArrayList<>();
+        for (int a = reachOld + 1; a <= reachOld + gap; a += CityPlan.SEGMENT) {
+            int a1 = Math.min(reachOld + gap, a + CityPlan.SEGMENT - 1);
+            int[] bx = CityPlan.box(arm, a, a1, -(CityPlan.ROAD_HALF + 1), CityPlan.ROAD_HALF + 1);
+            out.add(new Plot(0, "road", "", from.cx + bx[0], from.cz + bx[1], bx[2] - bx[0] + 1, bx[3] - bx[1] + 1,
+                    CityPlan.DIRS[arm], 0, HIGHWAY, NO_Y, "", "todo"));
+        }
+        return out;
     }
 
     private static String cap(String s) {
@@ -447,12 +788,18 @@ public final class City {
     }
 
     /** The founder tells the others, and each says what they'll take on first. */
-    private static void announce(MinecraftServer server, Town t, String founder, List<String> names) {
+    private static void announce(MinecraftServer server, Town t, String founder, List<String> names, Town from) {
         List<String> others = new ArrayList<>();
         for (String n : names) if (!n.equalsIgnoreCase(founder)) others.add(n);
         String to = others.isEmpty() ? "" : String.join(", ", others) + ", ";
-        HumanChat.say(server, founder, to + "let's build a town! calling it " + t.name + ". the plaza goes at " + t.cx + " " + t.cy + " " + t.cz
-                + ". plaza and roads first, then a warehouse for all our stuff, a shop each, farms, a temple, a mall and an amphitheatre");
+        if (from != null) {
+            String way = CityPlan.dirOf(Integer.signum(t.cx - from.cx), Integer.signum(t.cz - from.cz));
+            HumanChat.say(server, founder, to + "time for the next town! " + t.name + ", " + way + " of " + from.name + " (plaza at " + t.cx + " " + t.cy + " " + t.cz + "). first the road out there, then the plaza, a temple"
+                    + " and a pvp arena like every town gets, shops, farms, the lot");
+        } else {
+            HumanChat.say(server, founder, to + "let's build a town! calling it " + t.name + ". the plaza goes at " + t.cx + " " + t.cy + " " + t.cz
+                    + ". plaza and roads first, then a warehouse for all our stuff, a shop each, farms, a temple, a pvp arena, a mall and an amphitheatre");
+        }
         String[] jobs = {"i'll start on the roads", "i'll get the warehouse going", "i'll do the farm", "i'll put up my shop first",
                 "i'll gather stone, we'll need tons"};
         String last = founder;
@@ -487,7 +834,7 @@ public final class City {
                 double ang = Math.PI / 4 * k;
                 int cx = anchor[0] + (int) Math.round(Math.cos(ang) * dist), cz = anchor[2] + (int) Math.round(Math.sin(ang) * dist);
                 int[] r = onServer(server, () -> rateSite(bot.level(), cx, cz, anchor[1], bounds), null);
-                if (r == null) continue;
+                if (r == null || unknown(r)) continue;
                 r[3] += (int) (ring * 20);
                 if (best == null || r[3] < best[3]) best = r;
             }
@@ -499,7 +846,8 @@ public final class City {
     /** "forget the town". */
     static synchronized void forget() {
         load();
-        town = null;
+        TOWNS.clear();
+        DEAD_GATES.clear();
         forgotten = true;
         save();
         CLAIMS.clear();
@@ -524,16 +872,25 @@ public final class City {
 
     /** The piece this bot works on next (the one it's on, else the first free one in order), or null. */
     static synchronized Plot claim(Town t, String me, Set<String> online) {
+        return claim(List.of(t), me, online);
+    }
+
+    /** Same, over several towns (the older ones' pieces first). */
+    static synchronized Plot claim(List<Town> ts, String me, Set<String> online) {
         long now = System.currentTimeMillis();
         ACTIVE.values().removeIf(a -> now - a.beat() > 3 * 60 * 60_000L); // a bot that died mid-build
-        for (Plot p : t.plots) {
+        List<Plot> all = new ArrayList<>();
+        for (Town t : ts) all.addAll(t.plots);
+        for (Plot p : all) {
             Claim c = CLAIMS.get(p.id);
             if (c != null && c.bot().equals(me) && p.state.equals("todo") && now >= PLOT_BACKOFF.getOrDefault(p.id, 0L)) {
                 CLAIMS.put(p.id, new Claim(me, now));
                 return p;
             }
         }
-        for (Plot p : t.plots) {
+        for (Plot p : all) {
+            Town t = townOf(p);
+            if (t == null) continue;
             if (!p.state.equals("todo") || now < PLOT_BACKOFF.getOrDefault(p.id, 0L)) continue;
             Claim c = CLAIMS.get(p.id);
             if (c != null && !c.bot().equals(me) && now - c.beat() < 15 * 60_000L) continue;
@@ -661,7 +1018,7 @@ public final class City {
             }
         }
         if (left == 0) {
-            finished(server, bot, b, t, p);
+            finished(server, bot, b, t, p, placed);
             return 1;
         }
         if (left < 0) return 0;
@@ -714,7 +1071,8 @@ public final class City {
         HumanChat.say(server, bot, "skipping " + p.label() + ": " + why);
     }
 
-    private static void finished(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, Town t, Plot p) {
+    private static void finished(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, Town t, Plot p,
+                                 BlueprintBuilder.Placed placed) throws InterruptedException {
         p.state = "done";
         if (p.kind.equals("shop") && p.owner.isEmpty() && t.shopOf(b.name) == null) p.owner = b.name;
         release(p);
@@ -729,6 +1087,15 @@ public final class City {
         }
         int done = t.done(), all = t.plots.size();
         if (p.road()) {
+            if (p.arm == HIGHWAY) {
+                boolean last = true;
+                for (Plot o : t.plots) if (o.arm == HIGHWAY && !o.done()) last = false;
+                Town from = null;
+                for (Town o : towns()) if (o.id == t.parent) from = o;
+                if (last) HumanChat.say(server, b.name, "the road to " + t.name + " is done" + (from == null ? "" : ", you can walk there from " + from.name));
+                else if (RNG.nextInt(4) == 0) SurvivalBrain.maybeSay(server, b, "another bit of the road to " + t.name + " done", 0.6);
+                return;
+            }
             if (RNG.nextInt(3) == 0) SurvivalBrain.maybeSay(server, b, "another bit of the " + p.face + " road done", 0.6);
             return;
         }
@@ -739,9 +1106,87 @@ public final class City {
             case "farm" -> ". we'll all keep it harvested";
             case "mall" -> ". anyone can sell their stuff there";
             case "amphitheatre" -> ". showtime";
+            case "arena" -> ". want a duel? say \"fight me\" and meet me there";
             default -> "";
         };
         HumanChat.say(server, b.name, p.label() + " is finished" + extra + " (" + t.name + ": " + done + "/" + all + " done)");
+        if (p.kind.equals("temple")) {
+            NEXT_PORTAL.put(p.id, System.currentTimeMillis() + 20 * 60_000L);
+            lightPortal(server, bot, b, placed, true);
+        }
+    }
+
+    /** A design with a nether portal in it (the temple): once the frame is up, light it. Job thread. */
+    static boolean lightPortal(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, BlueprintBuilder.Placed placed,
+                               boolean talk) throws InterruptedException {
+        if (placed == null) return false;
+        Schematic s = placed.plan();
+        List<BlockPos> cells = new ArrayList<>();
+        for (int y = 0; y < s.sy; y++) for (int z = 0; z < s.sz; z++) for (int x = 0; x < s.sx; x++) {
+            State st = s.at(x, y, z);
+            if (st != null && st.path().equals("nether_portal")) cells.add(placed.world(x, y, z));
+        }
+        if (cells.isEmpty()) return false;
+        // lit already? (or the frame isn't real obsidian yet: a stand-in frame can't hold a portal)
+        boolean[] state = onServer(server, () -> {
+            boolean lit = false, frame = true;
+            for (BlockPos q : cells) {
+                if (SurvivalBrain.blockPath(bot.level().getBlockState(q)).equals("nether_portal")) lit = true;
+            }
+            for (BlockPos q : cells) {
+                for (BlockPos n : new BlockPos[]{q.below(), q.above(), q.offset(0, 0, -1), q.offset(0, 0, 1), q.offset(1, 0, 0), q.offset(-1, 0, 0)}) {
+                    State plan = placed.at(n);
+                    if (plan != null && plan.path().equals("obsidian")
+                            && !SurvivalBrain.blockPath(bot.level().getBlockState(n)).equals("obsidian")) frame = false;
+                }
+            }
+            return new boolean[]{lit, frame};
+        }, new boolean[]{true, false});
+        if (state[0]) return false;
+        if (!state[1]) {
+            if (talk) HumanChat.say(server, b.name, "the temple's portal frame needs real obsidian before it'll light. put some in a chest and i'll swap it in");
+            return false;
+        }
+        if (onServer(server, () -> Gathering.countOf(bot, "flint_and_steel"::equals), 0) == 0) {
+            Storage.withdraw(server, bot, b, "flint_and_steel"::equals, 1, null);
+            if (onServer(server, () -> Gathering.countOf(bot, "flint_and_steel"::equals), 0) == 0) {
+                Storage.withdraw(server, bot, b, "flint"::equals, 1, null);
+                if (onServer(server, () -> Gathering.countOf(bot, "flint"::equals), 0) > 0) {
+                    BlueprintBuilder.make(server, bot, b, "iron_ingot", 1, 0, it -> it.equals("flint"));
+                }
+                onServer(server, () -> {
+                    if (Gathering.countOf(bot, "flint"::equals) > 0 && Gathering.countOf(bot, "iron_ingot"::equals) > 0) {
+                        SurvivalBrain.take(bot, "flint"::equals, 1);
+                        SurvivalBrain.take(bot, "iron_ingot"::equals, 1);
+                        SurvivalBrain.give(bot, "flint_and_steel", 1);
+                    }
+                    return true;
+                }, false);
+            }
+        }
+        if (onServer(server, () -> Gathering.countOf(bot, "flint_and_steel"::equals), 0) == 0) {
+            if (talk) HumanChat.say(server, b.name, "the temple's portal is ready to light. bring me a flint and steel (or some flint) and i'll do it");
+            return false;
+        }
+        if (!walk(server, bot, b, cells.get(0), 3, 120)) return false;
+        String result = onServer(server, () -> {
+            ServerLevel level = bot.level();
+            // anything in the frame (dirt, plants, snow) has to go first
+            for (BlockPos q : cells) {
+                if (!level.getBlockState(q).isAir()) BlueprintBuilder.setState(level, q, State.parse("minecraft:air"));
+            }
+            BlockPos at = cells.get(0);
+            io.github.yudiiee.aicompanion.PlayerUtils.BlockAim.look(bot, net.minecraft.world.phys.Vec3.atCenterOf(at));
+            Motions.swingArm(bot);
+            BlueprintBuilder.setState(level, at, State.parse("minecraft:fire"));
+            return SurvivalBrain.blockPath(level.getBlockState(at)).equals("nether_portal") ? "lit" : "no";
+        }, "no");
+        if (result.equals("lit")) {
+            HumanChat.say(server, b.name, HumanChat.pick("lit the temple portal!", "the portal's lit, the temple's open to the nether"));
+            return true;
+        }
+        HumanChat.say(server, b.name, "tried to light the temple portal but it won't catch, something's off with the frame");
+        return true;
     }
 
     /** Puts a plan together the usual way (gather, clear, place), a few rounds. Remaining essential cells, or -1. Job thread. */
@@ -794,7 +1239,7 @@ public final class City {
         boolean alongX = d[0] != 0;
         int len = alongX ? p.w : p.l;
         // the height the road starts at: where the piece before it (nearer the plaza) ended
-        int startY = t.cy;
+        int startY = p.arm == HIGHWAY ? highwayStart(t, p) : t.cy;
         for (Plot o : t.plots) {
             if (!o.road() || o.arm != p.arm || o.id >= p.id || o.y == NO_Y) continue;
             startY = o.y;
@@ -862,13 +1307,31 @@ public final class City {
         return new BlueprintBuilder.Placed(plan, new BlockPos(p.x0, y0, p.z0), 0, t.dim);
     }
 
+    /** The height the road between two towns starts at: where the old town's avenue ended (else its plaza). */
+    static int highwayStart(Town t, Plot p) {
+        Town from = null;
+        for (Town o : TOWNS) if (o.id == t.parent) from = o;
+        if (from == null) return t.fromY;
+        int arm = -1;
+        for (int i = 0; i < 4; i++) if (CityPlan.DIRS[i].equals(p.face)) arm = i;
+        int y = from.cy, far = -1;
+        int[] v = CityPlan.vec(p.face);
+        for (Plot o : from.plots) {
+            if (!o.road() || o.arm != arm || o.y == NO_Y) continue;
+            int a = v[0] > 0 ? o.x0 + o.w - 1 - from.cx : v[0] < 0 ? from.cx - o.x0 : v[1] > 0 ? o.z0 + o.l - 1 - from.cz : from.cz - o.z0;
+            if (a > far) { far = a; y = o.y; }
+        }
+        return y;
+    }
+
     /** Part of a finished road (or its lamps)? Those aren't dug up for materials or by the pathfinder. */
     static boolean protectsRoad(String dim, BlockPos q) {
-        Town t = town;
-        if (t == null || !t.dim.equals(dim)) return false;
-        for (Plot p : t.plots) {
-            if (!p.road() || !p.done() || p.y == NO_Y) continue;
-            if (p.inside(q.getX(), q.getZ(), 0) && q.getY() >= p.y - 18 && q.getY() <= p.y + 18) return true;
+        for (Town t : TOWNS) {
+            if (!t.dim.equals(dim)) continue;
+            for (Plot p : t.plots) {
+                if (!p.road() || !p.done() || p.y == NO_Y) continue;
+                if (p.inside(q.getX(), q.getZ(), 0) && q.getY() >= p.y - 18 && q.getY() <= p.y + 18) return true;
+            }
         }
         return false;
     }
@@ -1196,42 +1659,165 @@ public final class City {
         String me = b.name;
         long now = System.currentTimeMillis();
         if (now < NEXT.getOrDefault(me, 0L)) return false;
-        Town t = town();
-        if (t == null) return maybeFound(server, bot, b);
-        boolean here = onServer(server, () -> t.dim.equals(Home.dim(bot.level()))
-                && bot.blockPosition().distSqr(t.center()) < 400 * 400, false);
+        Town near = onServer(server, () -> nearest(bot.level(), bot.blockPosition()), null);
+        if (near == null) return maybeFound(server, bot, b);
+        boolean here = onServer(server, () -> bot.blockPosition().distSqr(near.center()) < 600 * 600, false);
         if (!here) return false;
-        return doTownThing(server, bot, b, t, false);
+        return doTownThing(server, bot, b, false);
     }
 
-    private static boolean doTownThing(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, Town t, boolean asked)
+    /**
+     * Every town gets a PvP arena: a town laid out before there were arenas gets one at the end of
+     * its open avenue (that end then isn't free for a road to another town). Job/brain thread.
+     */
+    static void addMissingArena(Town t) {
+        for (Plot p : t.plots) if (p.kind.equals("arena")) return;
+        Blueprints.Entry e = Blueprints.byFile("town_arena.nbt");
+        if (e == null || ARENA_TRIED.contains(t.id)) return;
+        Schematic s;
+        try {
+            s = Blueprints.plan(e);
+        } catch (IOException | RuntimeException ex) {
+            return;
+        }
+        synchronized (City.class) {
+            for (Plot p : t.plots) if (p.kind.equals("arena")) return;
+            ARENA_TRIED.add(t.id);
+            // the end of the avenue opposite the temple (the open ends stay free for roads to other towns)
+            int arm = (t.templeArm + 2) % 4;
+            CityPlan.Design d = new CityPlan.Design("arena", e.fileName(), s.sx, s.sz, e.front());
+            int[] v = CityPlan.vec(CityPlan.DIRS[arm]);
+            int reach = Math.max(t.reach(arm), 8);
+            boolean blocked = false; // a building sitting across the avenue's line past its road (the amphitheatre)
+            for (Plot p : t.plots) {
+                int a = v[0] > 0 ? p.x0 + p.w - 1 - t.cx : v[0] < 0 ? t.cx - p.x0 : v[1] > 0 ? p.z0 + p.l - 1 - t.cz : t.cz - p.z0;
+                boolean onLine = v[0] != 0 ? p.z0 - t.cz <= 3 && p.z0 + p.l - 1 - t.cz >= -3 : p.x0 - t.cx <= 3 && p.x0 + p.w - 1 - t.cx >= -3;
+                if (!p.road() && onLine && a > reach) blocked = true;
+                reach = Math.max(reach, a);
+            }
+            int a0 = reach + CityPlan.GAP + 1;
+            // clear of anybody's builds and homes
+            for (int tries = 0; tries < 8; tries++) {
+                int[] bx = CityPlan.box(arm, a0, a0 + d.depth() - 1, -(d.width() / 2), -(d.width() / 2) + d.width() - 1);
+                int x0 = t.cx + bx[0] - 4, z0 = t.cz + bx[1] - 4, x1 = t.cx + bx[2] + 4, z1 = t.cz + bx[3] + 4;
+                boolean clash = false;
+                for (Blueprints.Build b : Blueprints.builds()) {
+                    if (b.dim().equals(t.dim) && b.x() <= x1 && b.x() + b.sx() - 1 >= x0 && b.z() <= z1 && b.z() + b.sz() - 1 >= z0) clash = true;
+                }
+                for (Home.Base h : Home.all()) {
+                    BlockPos m = h.middle();
+                    if (h.dim().equals(t.dim) && m.getX() >= x0 && m.getX() <= x1 && m.getZ() >= z0 && m.getZ() <= z1) clash = true;
+                }
+                if (!clash) break;
+                a0 += 16;
+                blocked = true; // the road would have to go round
+            }
+            int[] bx = CityPlan.box(arm, a0, a0 + d.depth() - 1, -(d.width() / 2), -(d.width() / 2) + d.width() - 1);
+            String face = CityPlan.dirOf(-v[0], -v[1]);
+            int id = t.id * 1000 + 900;
+            for (Plot p : t.plots) id = Math.max(id, p.id + 1);
+            if (!blocked) {
+                // the avenue carries on out to it
+                for (int a = Math.max(t.reach(arm), 8) + 1; a < a0; a += CityPlan.SEGMENT) {
+                    int a1 = Math.min(a0 - 1, a + CityPlan.SEGMENT - 1);
+                    int[] rb = CityPlan.box(arm, a, a1, -(CityPlan.ROAD_HALF + 1), CityPlan.ROAD_HALF + 1);
+                    t.plots.add(new Plot(id++, "road", "", t.cx + rb[0], t.cz + rb[1], rb[2] - rb[0] + 1, rb[3] - rb[1] + 1,
+                            CityPlan.DIRS[arm], 0, arm, NO_Y, "", "todo"));
+                }
+            }
+            t.plots.add(new Plot(id, "arena", e.fileName(), t.cx + bx[0], t.cz + bx[1], bx[2] - bx[0] + 1, bx[3] - bx[1] + 1, face,
+                    CityPlan.turnsTo(d.front(), face), arm, NO_Y, "", "todo"));
+            save();
+        }
+    }
+
+    private static final Set<Integer> ARENA_TRIED = ConcurrentHashMap.newKeySet();
+
+    /** The towns in the bot's dimension within a long walk, oldest first. Server thread. */
+    private static List<Town> around(ServerPlayer bot) {
+        String dim = Home.dim(bot.level());
+        List<Town> out = new ArrayList<>();
+        for (Town t : towns()) if (t.dim.equals(dim) && bot.blockPosition().distSqr(t.center()) < 1200 * 1200) out.add(t);
+        return out;
+    }
+
+    private static volatile long nextExpansion = 0;
+    private static final Map<Integer, Long> NEXT_PORTAL = new ConcurrentHashMap<>();
+
+    /** A finished building of the town as it was put down (its plan, turned and placed), or null. */
+    static BlueprintBuilder.Placed placedOf(Town t, Plot p) {
+        if (t == null || p.y == NO_Y) return null;
+        Blueprints.Entry e = Blueprints.byFile(p.file);
+        if (e == null) return null;
+        for (Blueprints.Build r : Blueprints.builds()) {
+            if (!r.file().equals(e.fileName()) || !r.dim().equals(t.dim) || r.x() != p.x0 || r.z() != p.z0) continue;
+            try {
+                return new BlueprintBuilder.Placed(Blueprints.plan(e).rotated(r.rot()), new BlockPos(r.x(), r.y(), r.z()), r.rot(), r.dim());
+            } catch (IOException | RuntimeException ex) {
+                return null;
+            }
+        }
+        return null;
+    }
+    private static final Map<String, Long> INVITED = new ConcurrentHashMap<>();
+
+    private static boolean doTownThing(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, boolean asked)
             throws InterruptedException {
         String me = b.name;
         long now = System.currentTimeMillis();
-        if (town() != t) return false; // forgotten meanwhile
-        // once a day: the temple
-        if (t.built("temple") != null && onServer(server, () -> offeringDue(bot), false) && offer(server, bot, b, t, false)) return true;
-        // the shop: stock it and empty the till now and then
-        if (Economy.upkeepDue(me) && Economy.restock(server, bot, b, t)) return true;
-        // the next piece of the town
+        List<Town> mine = onServer(server, () -> around(bot), List.<Town>of());
+        if (mine.isEmpty()) return false; // forgotten meanwhile, or too far away
+        for (Town t : mine) addMissingArena(t);
+        Town near = onServer(server, () -> nearest(bot.level(), bot.blockPosition()), mine.get(0));
+        // once a day: the temple (the nearest one that's built)
+        Plot temple = onServer(server, () -> nearestBuilt(bot.level(), bot.blockPosition(), "temple", 800), null);
+        if (temple != null && onServer(server, () -> offeringDue(bot), false) && offer(server, bot, b, townOf(temple), false)) return true;
+        // the shop: stock it and empty the till now and then (its shop in the nearest town that has one)
+        if (Economy.upkeepDue(me)) {
+            Town shopTown = null;
+            for (Town t : mine) {
+                Plot s = t.shopOf(me);
+                if (s != null && s.done() && (shopTown == null || t == near)) shopTown = t;
+            }
+            if (shopTown != null && Economy.restock(server, bot, b, shopTown)) return true;
+        }
+        // the temple's portal, if it never got lit (no flint and steel back then, something in the frame)
+        if (temple != null && now >= NEXT_PORTAL.getOrDefault(temple.id, 0L)) {
+            NEXT_PORTAL.put(temple.id, now + 20 * 60_000L);
+            BlueprintBuilder.Placed tp = placedOf(townOf(temple), temple);
+            if (tp != null && lightPortal(server, bot, b, tp, false)) return true;
+        }
+        // the arena: now and then, invite whoever's around to a duel there
+        if (!asked && inviteToArena(server, bot, b)) return true;
+        // the next piece of a town (the older towns' first)
         Set<String> online = new java.util.HashSet<>();
         for (String n : onServer(server, () -> botNames(server), List.<String>of())) online.add(n.toLowerCase(Locale.ROOT));
-        Plot p = claim(t, me, online);
-        if (p != null) {
+        Plot p = claim(mine, me, online);
+        Town pt = p == null ? null : townOf(p);
+        if (p != null && pt != null) {
             String key = me + "#" + p.id;
             if (ANNOUNCED.putIfAbsent(key, now) == null) {
-                SurvivalBrain.maybeSay(server, b, HumanChat.pick("i'll take " + p.label(), "working on " + p.label() + " now",
-                        "gonna build " + p.label()), p.road() ? 0.4 : 1.0);
+                String where = mine.size() > 1 ? " in " + pt.name : "";
+                SurvivalBrain.maybeSay(server, b, HumanChat.pick("i'll take " + p.label() + where, "working on " + p.label() + where + " now",
+                        "gonna build " + p.label() + where), p.road() ? 0.4 : 1.0);
             }
-            int r = work(server, bot, b, t, p);
+            int r = work(server, bot, b, pt, p);
             if (r != 0) NEXT.put(me, System.currentTimeMillis() + (r > 0 ? 5_000L : 60_000L));
             return true;
         }
         // nothing free to build: fetch what someone else is short of
         Need n = takeNeed(me);
         if (n != null) {
-            help(server, bot, b, t, n);
+            Town nt = near;
+            for (Town t : mine) for (Plot q : t.plots) if (q.id == n.plot()) nt = t;
+            help(server, bot, b, nt, n);
             return true;
+        }
+        // the newest town is mostly built: on to the next one
+        Town newest = onServer(server, () -> townIn(bot.level()), mine.get(mine.size() - 1));
+        if (HumanConfig.get().autoCity && now >= nextExpansion && newest != null && newest.progress() >= 0.7) {
+            nextExpansion = now + 15 * 60_000L;
+            if (expand(server, bot, b, null) != null) return true;
         }
         NEXT.put(me, now + (asked ? 30_000L : 4 * 60_000L));
         return false;
@@ -1255,32 +1841,118 @@ public final class City {
         return found(server, bot, b, null, null) != null;
     }
 
-    /** Job: keep working on the town till there's nothing left to do (or told to stop). */
+    /** Job: keep working on the towns till there's nothing left to do (or told to stop). */
     static void workJob(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b) throws InterruptedException {
-        Town t = town();
-        if (t == null) return;
+        List<Town> mine = onServer(server, () -> around(bot), List.<Town>of());
+        if (mine.isEmpty()) return;
         // asked to work on it: give the pieces that got skipped another go
         boolean retry = false;
-        for (Plot p : t.plots) {
-            if (!p.state.equals("blocked")) continue;
-            p.state = "todo";
-            PLOT_FAILS.remove(p.id);
-            SOFT_FAILS.remove(p.id);
-            PLOT_BACKOFF.remove(p.id);
-            retry = true;
+        for (Town t : mine) {
+            for (Plot p : t.plots) {
+                if (!p.state.equals("blocked")) continue;
+                p.state = "todo";
+                PLOT_FAILS.remove(p.id);
+                SOFT_FAILS.remove(p.id);
+                PLOT_BACKOFF.remove(p.id);
+                retry = true;
+            }
         }
         if (retry) save();
         int idle = 0;
-        while (SurvivalBrain.canContinue(b) && idle < 3 && town() == t) {
+        while (SurvivalBrain.canContinue(b) && idle < 3 && !towns().isEmpty()) {
             NEXT.remove(b.name);
-            if (doTownThing(server, bot, b, t, true)) idle = 0;
+            if (doTownThing(server, bot, b, true)) idle = 0;
             else {
                 idle++;
                 SurvivalBrain.sleep(20_000L);
             }
         }
-        if (SurvivalBrain.canContinue(b)) HumanChat.say(server, b.name, "nothing left i can do on the town right now. "
-                + t.done() + "/" + t.plots.size() + " done");
+        Town t = town();
+        if (SurvivalBrain.canContinue(b) && t != null) HumanChat.say(server, b.name, "nothing left i can do on the towns right now. "
+                + t.name + " is " + t.done() + "/" + t.plots.size() + " done");
+    }
+
+    // ------------------------------------------------------------------------
+    // The arena: duels happen there
+    // ------------------------------------------------------------------------
+
+    /** Close enough to the middle of the arena to count as in it. */
+    static boolean inArena(Plot arena, BlockPos at) {
+        int dx = Math.abs(at.getX() - arena.midX()), dz = Math.abs(at.getZ() - arena.midZ());
+        int half = Math.max(6, Math.min(arena.w, arena.l) / 2 - 17); // the floor inside the walls, not the stands
+        int dy = at.getY() - arena.y;
+        return dx <= half && dz <= half && dy >= -1 && dy <= 4;
+    }
+
+    /**
+     * "fight me": every companion wants a duel to happen in the arena. With an arena built nearby,
+     * it says where, walks there and waits for you; the fight starts once you're both in it. With
+     * none, it says so and fights where you are. Server thread; returns what to say.
+     */
+    static String arenaDuel(MinecraftServer server, ServerPlayer bot, ServerPlayer player) {
+        Plot arena = nearestBuilt(player.level(), player.blockPosition(), "arena", 800);
+        if (arena == null) {
+            Town t = nearest(player.level(), player.blockPosition());
+            String later = t == null ? "" : t.built("arena") == null ? " (fights go in the arena once we've built one)" : "";
+            return PvpController.start(bot, player, null) + later;
+        }
+        if (inArena(arena, bot.blockPosition()) && inArena(arena, player.blockPosition())) return PvpController.start(bot, player, null);
+        Town t = townOf(arena);
+        UUID who = player.getUUID();
+        String name = player.getName().getString();
+        SurvivalBrain.startJob(bot, "duel " + name + " at the arena", true, (s, bt, bb) -> duelJob(s, bt, bb, arena, who, name));
+        return HumanChat.pick("not here. 1v1 me at the arena", "let's do it properly, at the arena", "arena. now. 1v1")
+                + (t == null ? "" : " in " + t.name) + " (" + arena.midX() + " " + arena.y + " " + arena.midZ() + "). meet me there";
+    }
+
+    /** Goes to the arena and waits for the challenger, then fights. Job thread. */
+    private static void duelJob(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, Plot arena, UUID who, String name)
+            throws InterruptedException {
+        BlockPos mid = new BlockPos(arena.midX(), arena.y + 1, arena.midZ());
+        walk(server, bot, b, mid, 4, 240);
+        long until = System.currentTimeMillis() + 4 * 60_000L;
+        boolean nagged = false;
+        while (SurvivalBrain.canContinue(b) && System.currentTimeMillis() < until) {
+            String started = onServer(server, () -> {
+                ServerPlayer p = server.getPlayerList().getPlayer(who);
+                if (p == null) return "gone";
+                if (!inArena(arena, p.blockPosition())) return null;
+                if (!inArena(arena, bot.blockPosition())) return null;
+                return PvpController.start(bot, p, null);
+            }, null);
+            if ("gone".equals(started)) {
+                HumanChat.say(server, b.name, HumanChat.pick("they left lol", "no show, ok"));
+                return;
+            }
+            if (started != null) {
+                HumanChat.say(server, b.name, started);
+                return;
+            }
+            if (!nagged && System.currentTimeMillis() > until - 2 * 60_000L) {
+                nagged = true;
+                HumanChat.say(server, b.name, name + " i'm at the arena (" + arena.midX() + " " + arena.midZ() + "), where you at");
+            }
+            // keep to the middle (the fight might start any second)
+            if (onServer(server, () -> !inArena(arena, bot.blockPosition()), false)) walk(server, bot, b, mid, 4, 60);
+            SurvivalBrain.sleep(1500);
+        }
+        if (SurvivalBrain.canContinue(b)) HumanChat.say(server, b.name, HumanChat.pick("you never showed up lol", "chickened out? the arena's open whenever"));
+    }
+
+    /** Once a day, with an arena built and a player around: "anyone up for a 1v1 at the arena?". Brain thread. */
+    private static boolean inviteToArena(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b) {
+        long day = onServer(server, () -> day(bot), 0L);
+        Long last = INVITED.get(b.name);
+        if (last != null && last >= day) return false;
+        Plot arena = onServer(server, () -> nearestBuilt(bot.level(), bot.blockPosition(), "arena", 300), null);
+        if (arena == null) return false;
+        ServerPlayer human = onServer(server, () -> SurvivalBrain.nearestHuman(bot), null);
+        if (human == null || onServer(server, () -> human.distanceToSqr(bot) > 48 * 48, true)) return false;
+        INVITED.put(b.name, day);
+        if (RNG.nextInt(3) != 0) return false; // not every day
+        HumanChat.say(server, b.name, HumanChat.pick("anyone up for a 1v1 at the arena? say \"fight me\"",
+                "arena's open, who wants a duel", "bet nobody can beat me at the arena"));
+        return false; // it's only talk: carry on with the day
     }
 
     // ------------------------------------------------------------------------
@@ -1291,7 +1963,14 @@ public final class City {
     static String describe() {
         Town t = town();
         if (t == null) return "we don't have a town yet. say \"let's build a city\" and we'll start one";
-        StringBuilder sb = new StringBuilder(t.name).append(" (plaza at ").append(t.cx).append(' ').append(t.cy).append(' ').append(t.cz)
+        StringBuilder sb = new StringBuilder();
+        List<Town> all = towns();
+        if (all.size() > 1) {
+            List<String> names = new ArrayList<>();
+            for (Town o : all) names.add(o.name + " " + Math.round(o.progress() * 100) + "%");
+            sb.append(all.size()).append(" towns joined up by road: ").append(String.join(", ", names)).append(". newest: ");
+        }
+        sb.append(t.name).append(" (plaza at ").append(t.cx).append(' ').append(t.cy).append(' ').append(t.cz)
                 .append("): ").append(t.done()).append('/').append(t.plots.size()).append(" done");
         List<String> on = new ArrayList<>(), next = new ArrayList<>(), built = new ArrayList<>();
         for (Plot p : t.plots) {
@@ -1303,6 +1982,9 @@ public final class City {
                 else if (next.size() < 3) next.add(p.label());
             }
         }
+        boolean roadOut = false;
+        for (Plot p : t.plots) if (p.arm == HIGHWAY && !p.done()) roadOut = true;
+        if (roadOut) sb.append(". the road out to it isn't finished yet");
         if (!built.isEmpty()) sb.append(". built: ").append(String.join(", ", built.subList(0, Math.min(6, built.size()))));
         if (!on.isEmpty()) sb.append(". working on ").append(String.join(", ", on));
         if (!next.isEmpty()) sb.append(". next up: ").append(String.join(", ", next));
@@ -1314,37 +1996,53 @@ public final class City {
         return sb.toString();
     }
 
-    /** A line for the language model about the town. */
+    /** A few lines for the language model about the towns. */
     static String persona() {
-        Town t = town();
-        if (t == null) return "";
-        StringBuilder sb = new StringBuilder("You and the other companions are building a town together called ").append(t.name)
-                .append(" (plaza at ").append(t.cx).append(' ').append(t.cy).append(' ').append(t.cz).append("), ")
-                .append(t.done()).append(" of ").append(t.plots.size()).append(" pieces done.");
-        List<String> built = new ArrayList<>();
-        for (Plot p : t.plots) if (!p.road() && p.done()) built.add(p.label());
-        if (!built.isEmpty()) sb.append(" Built so far: ").append(String.join(", ", built)).append('.');
-        sb.append(" Each of you visits the temple once a day to leave food on the altar.");
+        List<Town> all = towns();
+        if (all.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder("You and the other companions are building a network of towns together, joined by roads: ");
+        List<String> parts = new ArrayList<>();
+        for (Town t : all) {
+            List<String> built = new ArrayList<>();
+            for (Plot p : t.plots) if (!p.road() && p.done() && !p.kind.equals("house") && !p.kind.equals("farm")) built.add(p.label());
+            parts.add(t.name + " (plaza at " + t.cx + " " + t.cy + " " + t.cz + ", " + Math.round(t.progress() * 100) + "% built"
+                    + (built.isEmpty() ? "" : ": " + String.join(", ", built)) + ")");
+        }
+        sb.append(String.join("; ", parts)).append(". Every town gets a temple and a PvP arena. Each of you visits a temple once a day to"
+                + " leave food on the altar. Duels happen in the arena: if anyone wants to fight, tell them to meet you there.");
         return sb.toString();
     }
 
-    /** Where something in town is. */
-    static String where(String what) {
-        Town t = town();
+    /** Where something in town is (the nearest one to {@code at}, when there are several towns). */
+    static String where(String what, ServerLevel level, BlockPos at) {
+        Town t = level != null && at != null ? nearest(level, at) : town();
         if (t == null) return "we don't have a town yet";
         if (what == null || what.matches("city|town|plaza|square|town square|middle")) {
-            return t.name + "'s plaza is at " + t.cx + " " + t.cy + " " + t.cz;
+            String more = towns().size() > 1 ? " (it's one of " + towns().size() + " towns, the newest is " + town().name + ")" : "";
+            return t.name + "'s plaza is at " + t.cx + " " + t.cy + " " + t.cz + more;
         }
         String kind = what.replace("amphitheater", "amphitheatre").replace("theatre", "amphitheatre").replace("theater", "amphitheatre")
-                .replace("market", "mall").replace("storage", "warehouse").replace("farms", "farm").replace("church", "temple");
+                .replace("market", "mall").replace("storage", "warehouse").replace("farms", "farm").replace("church", "temple")
+                .replace("pvp arena", "arena").replace("colosseum", "arena");
         if (kind.equals("amphiamphitheatre")) kind = "amphitheatre";
-        for (Plot p : t.plots) {
-            if (p.kind.equals(kind) || (kind.endsWith("shop") && p.kind.equals("shop") && kind.startsWith(p.owner.toLowerCase(Locale.ROOT)))) {
-                return p.label() + " is at " + p.midX() + " " + (p.y == NO_Y ? t.cy : p.y) + " " + p.midZ()
-                        + (p.done() ? "" : " (not built yet)");
+        Plot found = null;
+        Town in = t;
+        if (level != null && at != null) {
+            Plot built = nearestBuilt(level, at, kind, 5000);
+            if (built != null) { found = built; in = townOf(built); }
+        }
+        if (found == null) {
+            for (Plot p : t.plots) {
+                if (p.kind.equals(kind) || (kind.endsWith("shop") && p.kind.equals("shop") && kind.startsWith(p.owner.toLowerCase(Locale.ROOT)))) {
+                    found = p;
+                    break;
+                }
             }
         }
-        return "there's no " + what + " in " + t.name + " yet";
+        if (found == null) return "there's no " + what + " in " + t.name + " yet";
+        Town ft = in == null ? t : in;
+        return found.label() + (towns().size() > 1 ? " in " + ft.name : "") + " is at " + found.midX() + " "
+                + (found.y == NO_Y ? ft.cy : found.y) + " " + found.midZ() + (found.done() ? "" : " (not built yet)");
     }
 
     // ------------------------------------------------------------------------
@@ -1361,7 +2059,12 @@ public final class City {
     private static final Pattern WORK = Pattern.compile(
             "^(?:(?:ok|okay|pls|please|can you|could you|you|go|now|let'?s|lets)\\s+)*(work on|help (build|with)|keep building|continue( building)?|finish|get back to) (the |our )?(city|town)( please| pls)?[!.\\s]*$");
     private static final Pattern WHERE = Pattern.compile(
-            "\\bwhere('?s| is| are)( the| our| your)? (city|town|plaza|square|temple|mall|market|amphitheatre|amphitheater|theatre|theater|warehouse|storage|farms?|shop)\\b");
+            "\\bwhere('?s| is| are)( the| our| your)? (city|town|plaza|square|temple|mall|market|amphitheatre|amphitheater|theatre|theater"
+            + "|warehouse|storage|farms?|shop|pvp arena|arena|colosseum)\\b");
+    private static final Pattern EXPAND = Pattern.compile(
+            "^(?:(?:ok|okay|hey|yo|guys|pls|please|can you|could you|you|y'?all|let'?s|lets|we should|go|now)\\s+)*"
+            + "(?:(?:build|make|start|found|create|set up)\\s+(?:another|a second|a third|the next|one more|a new|more)\\s+(?:city|town|cities|towns)"
+            + "|expand (?:the |our )?(?:network|city|cities|town|towns))(?:\\s+(?:called|named)\\s+([a-z0-9' ]{2,24}))?[!.\\s]*$");
     private static final Pattern FORGET = Pattern.compile("^(forget( about)?|cancel|scrap|abandon|delete) (the |our )?(city|town)[!.\\s]*$");
     private static final Pattern OFFER = Pattern.compile(
             "^(?:(?:ok|okay|pls|please|can you|could you|you|go|now|let'?s|lets)\\s+)*(go )?(pray|make an offering|make (an )?offerings?|offer (some )?food|go to the temple|visit the temple)\\b");
@@ -1370,6 +2073,23 @@ public final class City {
     static Blueprints.Ask parse(String m, ServerPlayer player, ServerPlayer bot) {
         if (m == null || m.length() > 90) return null;
         String t = m.toLowerCase(Locale.ROOT).trim();
+        Matcher xm = EXPAND.matcher(t);
+        if (xm.find()) {
+            if (player == null) return new Blueprints.Ask(() -> "", null);
+            String name = xm.group(1);
+            if (town() == null) {
+                return new Blueprints.Ask(null, new MiningSkills.Request("found a town", "a town! let me find a good spot near our houses",
+                        (s, bt, bb) -> {
+                            found(s, bt, bb, null, name);
+                            if (town() != null) workJob(s, bt, bb);
+                        }));
+            }
+            return new Blueprints.Ask(null, new MiningSkills.Request("start the next town",
+                    HumanChat.pick("another town! gonna find a spot down one of the roads", "next town, let's go. finding a spot"),
+                    (s, bt, bb) -> {
+                        if (expand(s, bt, bb, name) != null) workJob(s, bt, bb);
+                    }));
+        }
         Matcher f = FOUND.matcher(t);
         if (f.find()) {
             boolean here = f.group(1) != null;
@@ -1377,7 +2097,14 @@ public final class City {
             if (player == null) return new Blueprints.Ask(() -> "", null);
             BlockPos at = here ? player.blockPosition() : null;
             Town existing = town();
-            if (existing != null) {
+            if (existing != null && !here && existing.progress() >= 0.5) {
+                return new Blueprints.Ask(null, new MiningSkills.Request("start the next town",
+                        existing.name + "'s coming along, so on to the next one. finding a spot down one of its roads",
+                        (s, bt, bb) -> {
+                            if (expand(s, bt, bb, name) != null) workJob(s, bt, bb);
+                        }));
+            }
+            if (existing != null && !here) {
                 return new Blueprints.Ask(null, new MiningSkills.Request("work on the town",
                         "we've got " + existing.name + " going already (" + existing.done() + "/" + existing.plots.size() + " done), back to work on it",
                         (s, bt, bb) -> workJob(s, bt, bb)));
@@ -1391,11 +2118,12 @@ public final class City {
         }
         if (FORGET.matcher(t).find()) {
             return new Blueprints.Ask(() -> {
-                Town x = town();
-                if (x == null) return "there's no town to forget";
+                Town x2 = town();
+                if (x2 == null) return "there's no town to forget";
                 if (player == null) return "";
+                int n = towns().size();
                 forget();
-                return "ok, forgot about " + x.name + ". what's built stays where it is";
+                return "ok, forgot about " + (n > 1 ? "all " + n + " towns" : x2.name) + ". what's built stays where it is";
             }, null);
         }
         if (STATUS.matcher(t).find()) return new Blueprints.Ask(City::describe, null);
@@ -1403,12 +2131,17 @@ public final class City {
         if (w.find()) {
             String what = w.group(3);
             if (what.equals("shop") && bot != null) {
-                Town x = town();
+                Town x = null;
+                for (Town o : towns()) {
+                    Plot os = o.shopOf(bot.getName().getString());
+                    if (os != null && (x == null || os.done())) x = o; // the newest finished one
+                }
                 Plot s = x == null ? null : x.shopOf(bot.getName().getString());
+                final int cy = x == null ? 0 : x.cy;
                 return new Blueprints.Ask(() -> s == null ? "i don't have a shop yet" : "my shop is at " + s.midX() + " "
-                        + (s.y == NO_Y ? x.cy : s.y) + " " + s.midZ() + (s.done() ? "" : " (still building it)"), null);
+                        + (s.y == NO_Y ? cy : s.y) + " " + s.midZ() + (s.done() ? "" : " (still building it)"), null);
             }
-            return new Blueprints.Ask(() -> where(what), null);
+            return new Blueprints.Ask(() -> player == null ? where(what, null, null) : where(what, player.level(), player.blockPosition()), null);
         }
         if (WORK.matcher(t).find()) {
             if (town() == null) return new Blueprints.Ask(() -> "we don't have a town yet. say \"let's build a city\" first", null);
@@ -1420,7 +2153,8 @@ public final class City {
             return new Blueprints.Ask(null, new MiningSkills.Request("make an offering at the temple",
                     HumanChat.pick("sure, heading to the temple", "ok, off to the temple"),
                     (s, bt, bb) -> {
-                        Town x = town();
+                        Plot tp = onServer(s, () -> nearestBuilt(bt.level(), bt.blockPosition(), "temple", 5000), null);
+                        Town x = tp != null ? townOf(tp) : town();
                         if (x == null) HumanChat.say(s, bb.name, "we don't have a town (or a temple) yet");
                         else offer(s, bt, bb, x, true);
                     }));

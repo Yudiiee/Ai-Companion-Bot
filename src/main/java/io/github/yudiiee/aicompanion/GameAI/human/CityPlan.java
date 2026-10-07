@@ -5,18 +5,18 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * How the companions lay out a town: a plaza in the middle, four avenues out of it (north,
- * east, south, west) with street lamps, the buildings along them facing the road, and a big
- * landmark at the end of an avenue (the temple to the north, the mall to the east, the
- * amphitheatre to the south). Plain Java, local coordinates around the plaza's centre.
+ * How the companions lay out a town: a plaza in the middle, four avenues out of it with street
+ * lamps, the buildings along them facing the road, the temple at the end of one avenue and the
+ * PvP arena at the end of the opposite one. The other two avenues stay open at their ends:
+ * roads to the next towns join there. Plain Java, local coordinates around the plaza's centre.
  *
  * <pre>
- *                    [temple]
- *              house  |N|  house
- *   farm  farm  ======[plaza]======  shop shop shop  [mall]
- *   warehouse         |S|         shop shop
- *              house  | |  house
- *                 [amphitheatre]
+ *                        [temple]
+ *                  house  |   |  house
+ *   farm  farm  ====road==[plaza]==road====  shop shop shop  ==> to the next town
+ *   warehouse  amphitheatre |   |   shop shop mall
+ *                  house  |   |  house
+ *                        [ arena ]
  * </pre>
  */
 public final class CityPlan {
@@ -218,23 +218,41 @@ public final class CityPlan {
     // The program: what a town has, in the order it gets built
     // ------------------------------------------------------------------------
 
-    /** The usual town for {@code shops} shopkeepers, given the designs it has (by kind). */
+    /** The usual town for {@code shops} shopkeepers, given the designs it has (by kind), with the temple at the north end. */
     public static List<Spot> program(Map<String, Design> d, int shops, List<Design> houses) {
+        return program(d, shops, houses, 0);
+    }
+
+    /**
+     * The usual town, built in this order: a warehouse, a shop each, a farm, the temple (at the
+     * end of avenue {@code templeArm}), the PvP arena (at the end of the opposite avenue), another
+     * farm, the mall and the amphitheatre (along the other two avenues, which stay open at their
+     * ends: that's where the roads to the next towns go), town houses and a last farm.
+     */
+    public static List<Spot> program(Map<String, Design> d, int shops, List<Design> houses, int templeArm) {
+        int t = Math.floorMod(templeArm, 4), right = (t + 1) % 4, back = (t + 2) % 4, left = (t + 3) % 4;
         List<Spot> out = new ArrayList<>();
-        add(out, d.get("warehouse"), 3, false);
-        for (int i = 0; i < Math.max(1, shops); i++) add(out, d.get("shop"), 1, false);
-        add(out, d.get("farm"), 3, false);
-        add(out, d.get("temple"), 0, true);
-        add(out, d.get("farm"), 3, false);
-        add(out, d.get("mall"), 1, true);
-        add(out, d.get("amphitheatre"), 2, true);
+        add(out, d.get("warehouse"), left, false);
+        for (int i = 0; i < Math.max(1, shops); i++) add(out, d.get("shop"), right, false);
+        add(out, d.get("farm"), left, false);
+        add(out, d.get("temple"), t, true);
+        add(out, d.get("arena"), back, true);
+        add(out, d.get("farm"), left, false);
+        add(out, d.get("mall"), right, false);
+        add(out, d.get("amphitheatre"), left, false);
         int i = 0;
         for (Design h : houses) {
-            add(out, h, i % 2 == 0 ? 0 : 2, false);
+            add(out, h, i % 2 == 0 ? t : back, false);
             i++;
         }
-        add(out, d.get("farm"), 3, false);
+        add(out, d.get("farm"), right, false);
         return out;
+    }
+
+    /** The avenues left open at the end (no landmark): where roads to other towns join. */
+    static int[] gates(int templeArm) {
+        int t = Math.floorMod(templeArm, 4);
+        return new int[]{(t + 1) % 4, (t + 3) % 4};
     }
 
     private static void add(List<Spot> out, Design d, int arm, boolean end) {

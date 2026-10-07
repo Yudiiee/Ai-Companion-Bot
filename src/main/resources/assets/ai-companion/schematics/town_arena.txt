@@ -1,0 +1,5 @@
+name: pvp arena
+aliases: arena, pvp arena, colosseum, fighting arena, duel arena
+about: A big sandstone PvP arena with stands, banners and a redstone centrepiece. Duels in town happen here.
+ground: 4
+front: west

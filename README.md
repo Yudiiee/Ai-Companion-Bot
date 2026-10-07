@@ -35,10 +35,11 @@ on their own out of the box, and you can hook them up to an LLM for real convers
   and tells you.
 - **Remembers its recipes.** Every companion knows the recipes in `config/ai-companion/recipes.txt` (171 to start,
   add your own): ask "how do i make a hopper", or "craft me 2 hoppers" and it makes them from scratch.
-- **Builds a town together.** Once they all have a house (or when you say "let's build a city"), the companions lay
-  out a town and build it as a team: a plaza with a fountain, avenues with street lamps, a shared warehouse, a shop
-  each, community farms, a temple, a mall, an amphitheatre and town houses. They ask each other for what they're
-  short of, and every day each one leaves some food at the temple.
+- **Builds a network of towns together.** Once they all have a house (or when you say "let's build a city"), the
+  companions lay out a town and build it as a team: a plaza with a fountain, avenues with street lamps, a shared
+  warehouse, a shop each, community farms, a temple, a PvP arena, a mall, an amphitheatre and town houses. When a
+  town is mostly built they start the next one down a new road, and the network keeps growing. They ask each other
+  for what they're short of, leave food at the temple every day, and take every duel to the arena.
 - **Runs on diamonds.** Every companion knows the price of 273 items (add your own in `config/ai-companion/prices.txt`). Ask "how
   much is an elytra", "sell me 16 bread" or "buy my iron"; they sell from their shops, buy from players and from
   each other, and keep a tab for fractions of a diamond.

@@ -1,5 +1,24 @@
 # AI Companion - Changelog
 
+## 1.6.0 (Minecraft 26.3)
+
+- A network of towns. Once the newest town is about 70% built (or when you say "build another city" / "expand the
+  network"), the companions start the next one straight down one of the open avenues of a town they already have,
+  joined to it by a 5-wide road with street lamps that they build first. Each town has two open avenue ends for
+  roads to the next towns, so the network keeps branching out. They pick a dry, flattish spot clear of builds and of
+  the other towns, walking out that way first if the land isn't loaded yet.
+- Every town has a temple and a PvP arena: a new temple (by iSthz) with a nether portal they light once the frame
+  is real obsidian and they have a flint and steel, and a big sandstone arena, at opposite ends of the town. Towns
+  from 1.5.0 get an arena added past their south end.
+- Duels happen in the arena. "fight me" now gets "1v1 me at the arena (x y z)": the bot walks there and the fight
+  starts once you're both on the arena floor. With no arena built nearby, it fights where you are. Now and then a
+  bot in town invites players to a duel at the arena.
+- Offerings go to the nearest temple, shops are run in whichever town the bot's shop is, and "where's the arena",
+  "how's the town going" and the language model know about every town.
+- The builder can make sandstone (plain, cut, smooth, stairs, slabs, walls), polished deepslate, deepslate bricks
+  and tiles, cracked stone bricks, copper blocks and cut copper; quartz, sea lanterns, froglights, obsidian, waxed
+  copper and shelves get the closest-looking stand-ins until the real thing is brought.
+
 ## 1.5.0 (Minecraft 26.3)
 
 - A diamond economy. Every companion remembers the price list (273 items, from poplar logs to the dragon egg); your

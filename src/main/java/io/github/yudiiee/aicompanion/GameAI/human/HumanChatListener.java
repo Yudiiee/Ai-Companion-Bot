@@ -260,7 +260,8 @@ public final class HumanChatListener {
             case CHESTS -> HumanChat.say(server, botName, Storage.describe(bot));
             case INVENTORY -> HumanChat.say(server, botName, SurvivalBrain.inventorySummary(bot));
             case CRAFT -> HumanChat.say(server, botName, SurvivalBrain.craftNow(bot));
-            case PVP -> HumanChat.say(server, botName, PvpController.start(bot, sender, null));
+            // duels belong in the arena: every companion asks to take it there
+            case PVP -> HumanChat.say(server, botName, City.arenaDuel(server, bot, sender));
             case CHEST -> HumanChat.say(server, botName, Storage.designate(bot, sender));
             case HOME -> {
                 MiningSkills.Request req = Home.goHomeRequest();

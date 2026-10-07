@@ -207,7 +207,7 @@ public final class Economy {
     /** Everything it can sell: pockets and shop. Server thread. */
     static Map<String, Integer> stock(ServerPlayer bot) {
         Map<String, Integer> out = new LinkedHashMap<>(pocketStock(bot));
-        City.Town t = City.townIn(bot.level());
+        City.Town t = City.shopTown(bot.level(), bot.blockPosition(), bot.getName().getString());
         Map<String, Integer> shop = City.contents(bot.level(), shopChests(bot.level(), t, bot.getName().getString()));
         shop.forEach((k, v) -> { if (!k.equals("diamond") && PriceBook.unit(k) > 0) out.merge(k, v, Integer::sum); });
         return out;
@@ -358,7 +358,7 @@ public final class Economy {
             }
             case STOCK -> {
                 Map<String, Integer> st = stock(bot);
-                City.Town t = City.townIn(bot.level());
+                City.Town t = City.shopTown(bot.level(), bot.blockPosition(), bot.getName().getString());
                 City.Plot shop = t == null ? null : t.shopOf(me);
                 String where = shop != null && shop.done() ? " (shop's at " + shop.midX() + " " + shop.midZ() + ")" : "";
                 if (st.isEmpty()) return "nothing to sell right now" + where;
@@ -583,7 +583,7 @@ public final class Economy {
         if (want <= 0) return 0;
         List<BlockPos> chests = onServer(server, () -> {
             List<BlockPos> out = new ArrayList<>();
-            City.Town t = City.townIn(bot.level());
+            City.Town t = City.shopTown(bot.level(), bot.blockPosition(), bot.getName().getString());
             if (t == null) return out;
             for (BlockPos c : shopChests(bot.level(), t, b.name)) {
                 if (City.contents(bot.level(), List.of(c)).entrySet().stream().anyMatch(e -> test.test(e.getKey()))) out.add(c);
@@ -710,14 +710,15 @@ public final class Economy {
     static int buyFromShops(MinecraftServer server, ServerPlayer bot, SurvivalBrain.Brain b, Predicate<String> test, String item, int want)
             throws InterruptedException {
         if (!on() || want <= 0) return 0;
-        City.Town t = City.town();
-        if (t == null) return 0;
+        if (City.towns().isEmpty()) return 0;
         double unit = PriceBook.unit(item);
         if (unit <= 0) return 0;
         String me = b.name;
         Offer best = onServer(server, () -> {
-            if (!t.dim.equals(Home.dim(bot.level()))) return null;
             Offer o = null;
+            String dim = Home.dim(bot.level());
+            for (City.Town t : City.towns()) {
+            if (!t.dim.equals(dim)) continue;
             for (City.Plot p : t.plots) {
                 if (!p.kind.equals("shop") || !p.done() || p.owner.isEmpty() || p.owner.equalsIgnoreCase(me)) continue;
                 double d = Math.sqrt(bot.blockPosition().distSqr(new BlockPos(p.midX(), p.y == City.NO_Y ? t.cy : p.y, p.midZ())));
@@ -727,6 +728,7 @@ public final class Economy {
                 int n = 0;
                 for (Map.Entry<String, Integer> e : City.contents(bot.level(), chests).entrySet()) if (test.test(e.getKey())) n += e.getValue();
                 if (n > 0 && (o == null || d < o.dist())) o = new Offer(p, chests, n, d);
+            }
             }
             return o;
         }, null);

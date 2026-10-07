@@ -172,6 +172,28 @@ final class BlueprintBuilder {
         like("polished_andesite", "andesite");
         like("polished_diorite", "diorite");
         like("tuff", "andesite", "cobblestone");
+        // nether quartz, ocean sea lanterns, froglights: the nearest overworld look
+        like("quartz_block", "smooth_sandstone", "calcite", "diorite");
+        like("smooth_quartz", "smooth_sandstone", "diorite");
+        like("quartz_stairs", "smooth_sandstone_stairs", "sandstone_stairs");
+        like("smooth_quartz_stairs", "smooth_sandstone_stairs", "sandstone_stairs");
+        like("quartz_slab", "smooth_sandstone_slab", "sandstone_slab");
+        like("sea_lantern", "glowstone", "glass");
+        like("ochre_froglight", "glowstone", "smooth_sandstone");
+        like("pearlescent_froglight", "glowstone", "smooth_sandstone");
+        like("verdant_froglight", "glowstone", "smooth_sandstone");
+        // obsidian takes a diamond pick and lava: dark stone until somebody brings some
+        like("obsidian", "cobbled_deepslate", "blackstone");
+        like("sticky_piston", "piston");
+        // waxing takes honeycomb: plain copper (it'll weather) until then
+        like("waxed_copper_block", "copper_block");
+        like("waxed_cut_copper", "cut_copper");
+        like("waxed_cut_copper_stairs", "cut_copper_stairs");
+        like("waxed_cut_copper_slab", "cut_copper_slab");
+        for (String w : new String[]{"oak", "spruce", "birch", "jungle", "acacia", "dark_oak", "mangrove", "cherry", "pale_oak", "bamboo",
+                "crimson", "warped", "poplar"}) {
+            like(w + "_shelf", w + "_trapdoor", w + "_slab");
+        }
         for (String c : new String[]{"white", "light_gray", "gray", "black", "brown", "red", "orange", "yellow", "lime", "green",
                 "cyan", "light_blue", "blue", "purple", "magenta", "pink"}) {
             like(c + "_stained_glass", "glass");          // tinted glass needs dye; clear glass for now
@@ -669,6 +691,28 @@ final class BlueprintBuilder {
         family("polished_diorite", "polished_diorite", false);
         family("polished_granite", "polished_granite", false);
         family("cobbled_deepslate", "cobbled_deepslate", true);
+        // sandstone and deepslate kinds (the PvP arena is sandstone and deepslate)
+        r("sandstone", 1, false, "sand", 4);
+        r("red_sandstone", 1, false, "red_sand", 4);
+        r("cut_sandstone", 4, true, "sandstone", 4);
+        r("cut_red_sandstone", 4, true, "red_sandstone", 4);
+        r("chiseled_sandstone", 1, true, "sandstone_slab", 2);
+        family("sandstone", "sandstone", true);
+        family("red_sandstone", "red_sandstone", true);
+        family("smooth_sandstone", "smooth_sandstone", false);
+        family("smooth_red_sandstone", "smooth_red_sandstone", false);
+        r("cut_sandstone_slab", 6, true, "cut_sandstone", 3);
+        r("cut_red_sandstone_slab", 6, true, "cut_red_sandstone", 3);
+        r("polished_deepslate", 4, false, "cobbled_deepslate", 4);
+        r("deepslate_bricks", 4, false, "polished_deepslate", 4);
+        r("deepslate_tiles", 4, false, "deepslate_bricks", 4);
+        family("polished_deepslate", "polished_deepslate", true);
+        family("deepslate_bricks", "deepslate_brick", true);
+        family("deepslate_tiles", "deepslate_tile", true);
+        // copper
+        r("copper_block", 1, true, "copper_ingot", 9);
+        r("cut_copper", 4, true, "copper_block", 4);
+        family("cut_copper", "cut_copper", false);
     }
 
     /** The recipe for an item; wooden things are made from that same kind of wood. */

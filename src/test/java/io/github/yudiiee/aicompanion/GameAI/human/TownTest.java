@@ -138,7 +138,8 @@ public class TownTest {
         d.put("warehouse", new CityPlan.Design("warehouse", "w", 11, 9, "south"));
         d.put("shop", new CityPlan.Design("shop", "s", 9, 9, "south"));
         d.put("farm", new CityPlan.Design("farm", "f", 13, 11, "south"));
-        d.put("temple", new CityPlan.Design("temple", "t", 15, 23, "south"));
+        d.put("temple", new CityPlan.Design("temple", "t", 32, 21, "south"));
+        d.put("arena", new CityPlan.Design("arena", "r", 75, 75, "west"));
         d.put("mall", new CityPlan.Design("mall", "m", 21, 15, "south"));
         d.put("amphitheatre", new CityPlan.Design("amphitheatre", "a", 25, 21, "south"));
         List<CityPlan.Design> houses = List.of(new CityPlan.Design("house", "h1", 18, 22, "east"),
@@ -185,8 +186,11 @@ public class TownTest {
             }
         }
         check(temple != null && temple.z1() < 0 && temple.face().equals("south"), "temple at the north end, facing the plaza");
-        check(mall != null && mall.x0() > 0 && mall.face().equals("west"), "mall at the east end facing the plaza");
-        check(amph != null && amph.z0() > 0 && amph.face().equals("north"), "amphitheatre at the south end");
+        CityPlan.Lot arena = null;
+        for (CityPlan.Lot l : lots) if (l.kind().equals("arena")) arena = l;
+        check(arena != null && arena.z0() > 0 && arena.face().equals("north") && arena.x0() < 0 && arena.x1() > 0,
+                "pvp arena at the south end, facing the plaza: " + arena);
+        check(mall != null && mall.arm() == 1 && amph != null && amph.arm() == 3, "mall and amphitheatre along the open avenues");
         check(shops == 3 && farms == 3 && roads >= 8, "3 shops, 3 farms, " + roads + " bits of road");
         // a road leads up to every building before it in the order
         int[] reach = new int[4];
@@ -207,7 +211,7 @@ public class TownTest {
                     case 2 -> l.z0();
                     default -> -l.x1();
                 };
-                if (reach[l.arm()] < near - CityPlan.GAP - 1 && !(l.kind().equals("temple") || l.kind().equals("mall") || l.kind().equals("amphitheatre"))) {
+                if (reach[l.arm()] < near - CityPlan.GAP - 1 && !(l.kind().equals("temple") || l.kind().equals("arena"))) {
                     roadsFirst = false;
                     System.out.println("  no road yet to " + l + " (road reaches " + reach[l.arm()] + ")");
                 }
@@ -215,7 +219,33 @@ public class TownTest {
         }
         check(roadsFirst, "the road out to a building comes before it");
         int[] bnd = CityPlan.bounds(lots);
-        check(bnd[2] - bnd[0] < 260 && bnd[3] - bnd[1] < 260, "town size " + (bnd[2] - bnd[0]) + "x" + (bnd[3] - bnd[1]));
+        check(bnd[2] - bnd[0] < 300 && bnd[3] - bnd[1] < 300, "town size " + (bnd[2] - bnd[0]) + "x" + (bnd[3] - bnd[1]));
+        // every way round: nothing overlaps, the temple and arena at opposite ends, the open avenues free at their ends
+        for (int ta = 0; ta < 4; ta++) {
+            List<CityPlan.Lot> ls = CityPlan.layout(plaza, CityPlan.program(d, 4, houses, ta));
+            int ov = 0;
+            for (int i = 0; i < ls.size(); i++) for (int j = i + 1; j < ls.size(); j++) if (ls.get(i).overlaps(ls.get(j))) ov++;
+            CityPlan.Lot tl = null, al = null;
+            for (CityPlan.Lot l : ls) {
+                if (l.kind().equals("temple")) tl = l;
+                if (l.kind().equals("arena")) al = l;
+            }
+            int[] gs = CityPlan.gates(ta);
+            boolean gatesFree = true;
+            for (int g : gs) {
+                int far = City.reach(ls, g);
+                int[] v = CityPlan.vec(CityPlan.DIRS[g]);
+                // nothing straddles the avenue's line past the end of its road
+                for (CityPlan.Lot l : ls) {
+                    if (l.road()) continue;
+                    boolean onLine = v[0] != 0 ? l.z0() <= 3 && l.z1() >= -3 : l.x0() <= 3 && l.x1() >= -3;
+                    int a = v[0] > 0 ? l.x0() : v[0] < 0 ? -l.x1() : v[1] > 0 ? l.z0() : -l.z1();
+                    if (onLine && a > far) gatesFree = false;
+                }
+            }
+            check(ov == 0 && tl != null && al != null && tl.arm() == ta && al.arm() == (ta + 2) % 4 && tl.face().equals(CityPlan.DIRS[(ta + 2) % 4])
+                    && gatesFree, "turned " + ta + ": temple " + (tl == null ? null : tl.face()) + ", arena opposite, open ends clear");
+        }
         // roads run along the axes
         boolean straight = true;
         for (CityPlan.Lot l : lots) {
@@ -225,6 +255,43 @@ public class TownTest {
             if (!ew && !(l.x0() == -3 && l.x1() == 3)) straight = false;
         }
         check(straight, "roads run straight out of the plaza");
+
+        // ---------------- the network ----------------
+        City.Town root = new City.Town("minecraft:overworld", 100, 64, -50, "Oakhollow", "Bro", 1L, 0, 0, -1, 64);
+        for (int g : CityPlan.gates(0)) root.gates.add(g);
+        for (CityPlan.Lot l : lots) root.plots.add(new City.Plot(l.id(), l.kind(), l.file(), 100 + l.x0(), -50 + l.z0(), l.w(), l.l(), l.face(),
+                l.rot(), l.arm(), City.NO_Y, "", "todo"));
+        check(root.gates.equals(java.util.Set.of(1, 3)), "the first town's open ends are east and west");
+        int reachE = root.reach(1);
+        check(reachE == City.reach(lots, 1) && reachE > 8, "how far the east avenue reaches: " + reachE);
+        List<City.Plot> hw = City.highway(root, 1, reachE, 100);
+        int lastX = Integer.MIN_VALUE;
+        boolean straight2 = true;
+        int prevEnd = 100 + reachE;
+        for (City.Plot h : hw) {
+            if (h.z0 != -53 || h.l != 7 || !h.face.equals("east") || h.x0 != prevEnd + 1) straight2 = false;
+            prevEnd = h.x0 + h.w - 1;
+            lastX = prevEnd;
+        }
+        check(straight2 && lastX == 100 + reachE + 100, "the road to the next town runs straight east from the end of the avenue");
+        // the next town: turned so an open avenue faces back, its road starting right where the highway ends
+        int in = 3, ta2 = (in + 1) % 4;
+        List<CityPlan.Lot> next = CityPlan.layout(plaza, CityPlan.program(d, 3, houses, ta2));
+        int reachNew = City.reach(next, in);
+        int[] c2 = City.spotFor(root, 1, reachE, 100, reachNew);
+        check(c2[1] == -50 && c2[0] - reachNew == lastX + 1, "the next town's west avenue starts where the road ends: " + c2[0]);
+        boolean inOpen = false;
+        for (int g : CityPlan.gates(ta2)) if (g == in) inOpen = true;
+        check(inOpen, "the next town's avenue back is one of its open ones");
+        City.Town t2 = new City.Town("minecraft:overworld", c2[0], 70, c2[1], "Stonebridge", "Ovi", 2L, 1, ta2, 0, 64);
+        t2.gates.add(1); t2.gates.add(3); t2.linked.add(3);
+        City.Town back2 = City.Town.parse(t2.line(), 5);
+        check(back2 != null && back2.id == 1 && back2.templeArm == ta2 && back2.parent == 0 && back2.fromY == 64
+                && back2.gates.equals(java.util.Set.of(1, 3)) && back2.linked.equals(java.util.Set.of(3)) && back2.name.equals("Stonebridge"),
+                "a town saved and read back");
+        City.Town legacy = City.Town.parse("town|minecraft:overworld|1|64|2|Diamondvale|Bro|123", 0);
+        check(legacy != null && legacy.templeArm == 0 && legacy.gates.equals(java.util.Set.of(3)) && legacy.parent == -1,
+                "a town from 1.5.0 reads back with its west end open");
 
         // ---------------- remembering it ----------------
         City.Plot plot = new City.Plot(4, "shop", "city_shop.nbt", 10, -20, 9, 9, "north", 2, 1, 64, "Bro", "todo");
@@ -248,6 +315,9 @@ public class TownTest {
                 "stopping isn't forgetting the town");
         check(City.parse("finish the town hall", null, null) == null, "finish the town hall isn't town work");
         check(City.parse("forget the town", null, null) != null, "forget the town");
+        check(City.parse("build another city", null, null) != null && City.parse("expand the network", null, null) != null
+                && City.parse("let's build a second town called riverbend", null, null) != null, "another town");
+        check(City.parse("where's the arena", null, null) != null && City.parse("where is the pvp arena", null, null) != null, "where's the arena");
         check(City.isOffering("bread") && City.isOffering("wheat") && !City.isOffering("diamond"), "offerings are food");
 
         // ---------------- chat routing ----------------
@@ -262,9 +332,9 @@ public class TownTest {
 
         // ---------------- the designs ----------------
         Path schem = res.resolve("schematics");
-        String[] kinds = {"plaza", "temple", "amphitheatre", "shop", "mall", "farm", "warehouse"};
+        String[] kinds = {"plaza", "temple", "arena", "amphitheatre", "shop", "mall", "farm", "warehouse"};
         for (String k : kinds) {
-            Path f = schem.resolve("city_" + k + ".nbt");
+            Path f = schem.resolve(City.filesFor(k)[0]);
             Schematic s = Schematic.load(f);
             Map<String, Integer> bill = BlueprintBuilder.billOf(s);
             int unobtainable = 0;
@@ -277,8 +347,8 @@ public class TownTest {
             if (!hard.isEmpty()) System.out.println("  (" + k + ": not obtainable in a test run: " + hard + ")");
             check(s.solidCount() > 100 && s.solidCount() < BlueprintBuilder.MAX_BLOCKS, k + ": " + s.sx + "x" + s.sy + "x" + s.sz + ", " + s.solidCount() + " blocks");
             check(unobtainable == 0, k + ": everything in it can be had " + bill.keySet());
-            String side = Files.readString(schem.resolve("city_" + k + ".txt"));
-            check(side.contains("front: south"), k + ": front is south");
+            String side = Files.readString(schem.resolve(City.filesFor(k)[0].replace(".nbt", ".txt")));
+            check(side.contains("front: south") || (k.equals("arena") && side.contains("front: west")), k + ": front");
         }
         Schematic shop = Schematic.load(schem.resolve("city_shop.nbt"));
         int chests = 0, barrels = 0;
@@ -289,13 +359,24 @@ public class TownTest {
             if (st.path().equals("barrel")) barrels++;
         }
         check(chests == 3 && barrels == 1, "shop: 3 stock chests and a till");
-        Schematic tmp = Schematic.load(schem.resolve("city_temple.nbt"));
+        Schematic tmp = Schematic.load(schem.resolve("town_temple.nbt"));
         boolean altar = false;
         for (int y = 0; y < tmp.sy; y++) for (int z = 0; z < tmp.sz; z++) for (int x = 0; x < tmp.sx; x++) {
             Schematic.State st = tmp.at(x, y, z);
             if (st != null && st.path().equals("chest")) altar = true;
         }
         check(altar, "temple has its offering chest");
+        int portal = 0;
+        for (int y = 0; y < tmp.sy; y++) for (int z = 0; z < tmp.sz; z++) for (int x = 0; x < tmp.sx; x++) {
+            Schematic.State st = tmp.at(x, y, z);
+            if (st != null && st.path().equals("nether_portal")) portal++;
+        }
+        check(portal > 0 && Schematic.Rules.kind(Schematic.State.parse("nether_portal")) == Schematic.Rules.Kind.KEEP,
+                "the temple's portal is left to be lit, not placed");
+        Schematic ar = Schematic.load(schem.resolve("town_arena.nbt"));
+        boolean noDirt = !ar.blockCounts().containsKey("minecraft:dirt") && !ar.blockCounts().containsKey("minecraft:grass_block");
+        check(noDirt && ar.solidCount() < BlueprintBuilder.MAX_BLOCKS, "the arena sits on the ground that's there (" + ar.solidCount() + " blocks)");
+        check(Files.readString(schem.resolve("town_arena.txt")).contains("ground: 4"), "the arena floor is at ground level");
         Schematic pl = Schematic.load(schem.resolve("city_plaza.nbt"));
         boolean keepsUnder = pl.at(0, 0, 0) == null && pl.at(7, 0, 7) != null;
         check(keepsUnder, "plaza leaves the ground under it alone except under the fountain");

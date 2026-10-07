@@ -199,3 +199,6 @@ RECIPE | ID: minecraft:conduit | TYPE: shaped | WORKSTATION: crafting_table | IN
 # ==============================================================================
 # END OF RECIPE FILE
 # ==============================================================================
+RECIPE | ID: minecraft:smooth_sandstone | TYPE: smelting | WORKSTATION: furnace | INPUTS: [sandstone] | OUTPUT: 1x minecraft:smooth_sandstone
+RECIPE | ID: minecraft:smooth_red_sandstone | TYPE: smelting | WORKSTATION: furnace | INPUTS: [red_sandstone] | OUTPUT: 1x minecraft:smooth_red_sandstone
+RECIPE | ID: minecraft:cracked_stone_bricks | TYPE: smelting | WORKSTATION: furnace | INPUTS: [stone_bricks] | OUTPUT: 1x minecraft:cracked_stone_bricks
